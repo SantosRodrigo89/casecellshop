@@ -102,3 +102,39 @@ Este arquivo registra os prompts relevantes utilizados durante o desenvolvimento
 - `npm test`: 9/9 verdes (3 suites: health, products service, products seed)
 - `GET /api/products` ao vivo: 5 produtos do seed, ordenados por nome, com `id` em vez de `_id`
 - `GET /api/docs`: Swagger atualizado com a tag `products` e schema `ProductResponseDto`
+
+---
+
+## Fase 5 — Orders Core
+
+**Prompt:** Módulo Orders completo (sem estoque, sem idempotência, sem ERP): schema Order com enum OrderStatus, CreateOrderDto com class-validator, OrderResponseDto com Swagger, POST /api/orders (valida produto + calcula total), GET /api/orders/:id. Testes para criação, produto inexistente e quantidade inválida.
+
+**Resultado:**
+- `orders/schemas/order.schema.ts` — schema Mongoose com enum `OrderStatus` (PENDING/PROCESSING/COMPLETED/FAILED), `idempotencyKey` (unique), `productId` como ref ObjectId, transform toJSON para `id`
+- `orders/dto/create-order.dto.ts` — `@IsMongoId`, `@IsInt`, `@Min(1)` com mensagens em PT
+- `orders/dto/order-response.dto.ts` — `@ApiProperty` completo incluindo enum de status
+- `orders/orders.service.ts` — `create()`: valida produto via `ProductsService.findById`, calcula total, cria com status PENDING e UUID como idempotencyKey placeholder; `findOne()`: valida ObjectId + 404 se não encontrado
+- `orders/orders.controller.ts` — `POST /api/orders` (201/400/404) e `GET /api/orders/:id` (200/404) com Swagger completo
+- `orders/orders.module.ts` — importa `MongooseModule.forFeature` + `ProductsModule`
+- `orders/orders.service.spec.ts` — 10 testes: validação do DTO (4), create (2), findOne (3), definição
+- `products/products.service.ts` — adicionado `findById(id)` com `isValidObjectId` guard
+- `products/products.service.spec.ts` — adicionados 2 testes para `findById`
+
+**Decisões:**
+- `ProductsService.findById` em vez de injetar o model de Product no OrdersModule: mantém cada serviço responsável pelo seu próprio modelo
+- `isValidObjectId` guard antes de qualquer query: evita CastError do Mongoose para IDs malformados, convertendo em 404 limpo
+- `randomUUID()` nativo do Node.js 20 (sem dependência extra): placeholder para idempotencyKey até a Fase 6
+- Total com `toFixed(2)` + `parseFloat`: evita imprecisão de ponto flutuante
+
+**Validação ao vivo:**
+- `POST /api/orders` → 201 PENDING, total calculado (2 × R$44,90 = R$89,80)
+- `GET /api/orders/:id` → retorna o pedido criado
+- `POST` quantity=0 → 400 com mensagem em PT
+- `POST` produto inexistente → 404
+- `GET` id inválido → 404
+- Swagger `/api/docs` → 200 com tags orders e products
+
+**Pendências para Fase 6:**
+- Redução atômica de estoque (`findOneAndUpdate` com `$gte`)
+- Idempotência real (header `Idempotency-Key` + índice único + deduplicação)
+- `FakeErpService` (timeout + falha) + compensação de estoque + status FAILED/503
