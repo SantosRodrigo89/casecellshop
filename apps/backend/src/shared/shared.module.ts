@@ -7,10 +7,10 @@ import { validateEnv } from '../config/env.validation';
 import { RedisProvider } from './redis.provider';
 
 /**
- * Hub de infraestrutura da aplicação (global).
- * Centraliza ConfigModule, conexão MongoDB (Mongoose), logger (pino) e o
- * provider Redis (ioredis). Marcado como @Global para que os módulos de
- * domínio injetem essas dependências sem reimportar.
+ * Global infrastructure hub.
+ * Centralises ConfigModule, MongoDB (Mongoose), structured logger (pino) and
+ * the Redis provider (ioredis). Marked @Global so domain modules can inject
+ * these dependencies without re-importing this module.
  */
 @Global()
 @Module({

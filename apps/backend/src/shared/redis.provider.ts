@@ -4,9 +4,9 @@ import Redis from 'ioredis';
 import { REDIS_CLIENT } from './redis.constants';
 
 /**
- * Provider da conexão ioredis, injetável via token REDIS_CLIENT.
- * Exportado pelo SharedModule (global) para uso no healthcheck e, futuramente,
- * no cache da vitrine (Fase 10).
+ * ioredis connection provider, injectable via the REDIS_CLIENT token.
+ * Exported by SharedModule (global) for use in the health check and,
+ * optionally, the product-list cache (Phase 10).
  */
 export const RedisProvider: Provider = {
   provide: REDIS_CLIENT,

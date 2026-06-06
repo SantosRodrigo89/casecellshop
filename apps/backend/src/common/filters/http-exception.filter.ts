@@ -7,8 +7,8 @@ import {
 import { Request, Response } from 'express';
 
 /**
- * Formata todas as HttpException em um envelope de erro consistente.
- * Registrado globalmente no main.ts na Fase 3.
+ * Formats all HttpExceptions into a consistent error envelope:
+ * { statusCode, message, path, timestamp }
  */
 @Catch(HttpException)
 export class HttpExceptionFilter implements ExceptionFilter {

@@ -10,12 +10,12 @@ export class ProductsController {
 
   @Get()
   @ApiOperation({
-    summary: 'Lista todos os produtos',
-    description: 'Retorna a vitrine de produtos ordenada por nome.',
+    summary: 'List all products',
+    description: 'Returns the product catalogue sorted by name.',
   })
   @ApiOkResponse({
     type: [ProductResponseDto],
-    description: 'Lista de produtos disponíveis.',
+    description: 'List of available products.',
   })
   findAll() {
     return this.productsService.findAll();

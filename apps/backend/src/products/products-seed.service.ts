@@ -5,12 +5,12 @@ import { Product, ProductDocument } from './schemas/product.schema';
 import { PRODUCT_SEEDS } from './products.seed';
 
 /**
- * Seed automática da coleção de produtos.
- * Separada do ProductsService para manter o serviço focado em regras de negócio
- * e permitir testar cada responsabilidade de forma independente.
+ * Automatic product seed service.
+ * Kept separate from ProductsService to maintain single responsibility and allow
+ * independent unit testing of each concern.
  *
- * Executada no boot via OnModuleInit, apenas quando a coleção estiver vazia.
- * Idempotente: reinicializações não duplicam registros.
+ * Runs on module init via OnModuleInit, only when the collection is empty.
+ * Idempotent: subsequent restarts never create duplicate records.
  */
 @Injectable()
 export class ProductsSeedService implements OnModuleInit {

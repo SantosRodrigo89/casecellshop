@@ -29,7 +29,6 @@ export class Product {
   @Prop()
   imageUrl?: string;
 
-  // Gerados automaticamente pelo Mongoose (timestamps: true)
   createdAt: Date;
   updatedAt: Date;
 }

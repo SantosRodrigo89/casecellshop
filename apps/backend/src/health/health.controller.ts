@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   HealthCheck,
   HealthCheckResult,
@@ -8,10 +8,6 @@ import {
 } from '@nestjs/terminus';
 import { RedisHealthIndicator } from './redis.health';
 
-/**
- * Healthcheck da aplicação. Agrega o status de MongoDB e Redis.
- * Resposta no formato padrão do @nestjs/terminus.
- */
 @ApiTags('health')
 @Controller('health')
 export class HealthController {
@@ -23,6 +19,11 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
+  @ApiOperation({
+    summary: 'Application health check',
+    description: 'Pings MongoDB and Redis and returns their status.',
+  })
+  @ApiOkResponse({ description: 'All dependencies are healthy.' })
   check(): Promise<HealthCheckResult> {
     return this.health.check([
       () => this.mongoose.pingCheck('mongodb'),

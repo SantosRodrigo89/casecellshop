@@ -25,6 +25,7 @@ describe('ProductsService', () => {
 
   const mockProductModel = {
     find: jest.fn(),
+    findById: jest.fn(),
     sort: jest.fn(),
     exec: jest.fn(),
   };
@@ -51,16 +52,36 @@ describe('ProductsService', () => {
   });
 
   describe('findAll()', () => {
-    it('retorna produtos ordenados por nome', async () => {
+    it('should return products sorted by name', async () => {
       const result = await service.findAll();
       expect(result).toEqual(mockProducts);
     });
 
-    it('chama find().sort({ name: 1 }).exec()', async () => {
+    it('should call find().sort({ name: 1 }).exec()', async () => {
       await service.findAll();
       expect(mockProductModel.find).toHaveBeenCalledTimes(1);
       expect(mockProductModel.sort).toHaveBeenCalledWith({ name: 1 });
       expect(mockProductModel.exec).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('findById()', () => {
+    it('should return null for an invalid ObjectId', async () => {
+      const result = await service.findById('not-an-objectid');
+      expect(result).toBeNull();
+      expect(mockProductModel.findById).not.toHaveBeenCalled();
+    });
+
+    it('should query the model with a valid ObjectId', async () => {
+      const fakeId = '6650a1b2c3d4e5f6a7b8c9d0';
+      const mockProduct = { id: fakeId, name: 'Capinha', price: 39.9 };
+      mockProductModel.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockProduct),
+      });
+
+      const result = await service.findById(fakeId);
+      expect(mockProductModel.findById).toHaveBeenCalledWith(fakeId);
+      expect(result).toEqual(mockProduct);
     });
   });
 });

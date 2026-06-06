@@ -15,7 +15,7 @@ describe('ProductsSeedService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
 
-    // Garante que onModuleInit (runSeed) não insira dados durante o setup dos testes
+    // Return a non-zero count so onModuleInit skips the insert during setup.
     mockProductModel.countDocuments.mockResolvedValue(1);
     mockProductModel.insertMany.mockResolvedValue([]);
 
@@ -27,7 +27,7 @@ describe('ProductsSeedService', () => {
     }).compile();
 
     service = module.get<ProductsSeedService>(ProductsSeedService);
-    jest.clearAllMocks(); // limpa as chamadas do onModuleInit
+    jest.clearAllMocks(); // discard calls made by onModuleInit
   });
 
   it('should be defined', () => {
@@ -35,7 +35,7 @@ describe('ProductsSeedService', () => {
   });
 
   describe('runSeed()', () => {
-    it('insere os seeds quando a coleção está vazia', async () => {
+    it('should insert seed data when the collection is empty', async () => {
       mockProductModel.countDocuments.mockResolvedValue(0);
       mockProductModel.insertMany.mockResolvedValue([]);
 
@@ -45,7 +45,7 @@ describe('ProductsSeedService', () => {
       expect(mockProductModel.insertMany).toHaveBeenCalledWith(PRODUCT_SEEDS);
     });
 
-    it('pula o insert quando já existem produtos', async () => {
+    it('should skip the insert when products already exist', async () => {
       mockProductModel.countDocuments.mockResolvedValue(5);
 
       await service.runSeed();
@@ -53,7 +53,7 @@ describe('ProductsSeedService', () => {
       expect(mockProductModel.insertMany).not.toHaveBeenCalled();
     });
 
-    it('os seeds contêm 5 produtos com os campos obrigatórios', () => {
+    it('seed data should contain 5 products with all required fields', () => {
       expect(PRODUCT_SEEDS).toHaveLength(5);
       PRODUCT_SEEDS.forEach((seed) => {
         expect(seed).toHaveProperty('name');

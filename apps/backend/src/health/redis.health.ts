@@ -7,8 +7,9 @@ import type Redis from 'ioredis';
 import { REDIS_CLIENT } from '../shared/redis.constants';
 
 /**
- * Indicador de saúde do Redis para o @nestjs/terminus.
- * O Terminus não traz indicador nativo para Redis, então fazemos um PING manual.
+ * Custom Redis health indicator for @nestjs/terminus.
+ * Terminus does not ship a built-in Redis indicator, so we issue a manual
+ * PING and verify the expected PONG response.
  */
 @Injectable()
 export class RedisHealthIndicator {

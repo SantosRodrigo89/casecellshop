@@ -14,9 +14,9 @@ enum ErpFailureMode {
 }
 
 /**
- * Schema de validação das variáveis de ambiente.
- * Executado no boot via ConfigModule.validate — a aplicação falha rápido
- * se uma variável obrigatória estiver ausente ou mal formatada.
+ * Environment variables validation schema.
+ * Loaded by ConfigModule.validate on boot — the application fails fast
+ * if a required variable is missing or malformatted.
  */
 class EnvironmentVariables {
   @IsEnum(NodeEnv)

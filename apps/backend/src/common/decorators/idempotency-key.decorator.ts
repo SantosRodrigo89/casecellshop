@@ -2,10 +2,10 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import { Request } from 'express';
 
 /**
- * Extrai o header Idempotency-Key do request.
- * Usado nos controllers de Orders para garantir idempotência no POST /orders.
+ * Extracts the Idempotency-Key header from the incoming request.
+ * Used in the Orders controller to prevent duplicate order creation.
  *
- * Uso: @IdempotencyKey() key: string
+ * Usage: @IdempotencyKey() key: string
  */
 export const IdempotencyKey = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): string | undefined => {

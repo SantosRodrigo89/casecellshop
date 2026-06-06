@@ -5,9 +5,9 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 
 /**
- * Smoke test de bootstrap: a aplicação sobe e o healthcheck agrega Mongo + Redis.
- * Requer MongoDB e Redis ativos (docker compose up). Os 6 cenários de negócio
- * chegam na Fase 7.
+ * Bootstrap smoke test: verifies the application starts and the health check
+ * aggregates MongoDB and Redis. Requires docker compose up.
+ * The 6 business scenario tests arrive in Phase 7.
  */
 describe('AppModule (e2e)', () => {
   let app: INestApplication;
@@ -26,7 +26,7 @@ describe('AppModule (e2e)', () => {
     await app.close();
   });
 
-  it('GET /api/health → 200 com status ok', () => {
+  it('GET /api/health should return 200 with status ok', () => {
     return request(app.getHttpServer() as Server)
       .get('/api/health')
       .expect(200)

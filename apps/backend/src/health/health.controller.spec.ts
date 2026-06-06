@@ -28,7 +28,7 @@ describe('HealthController', () => {
     expect(controller).toBeDefined();
   });
 
-  it('check() should aggregate mongodb and redis indicators', async () => {
+  it('should aggregate mongodb and redis health indicators', async () => {
     const result = { status: 'ok' };
     healthCheckService.check.mockResolvedValue(result);
 

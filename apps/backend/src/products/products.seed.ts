@@ -1,7 +1,7 @@
 /**
- * Dados de seed da vitrine.
- * Inseridos automaticamente pelo ProductsSeedService na primeira inicialização,
- * apenas quando a coleção de produtos estiver vazia.
+ * Initial product seed data.
+ * Inserted automatically by ProductsSeedService on first boot,
+ * only when the products collection is empty.
  */
 export const PRODUCT_SEEDS = [
   {

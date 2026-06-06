@@ -3,23 +3,21 @@ import { Injectable } from '@nestjs/common';
 export type ErpFailureMode = 'never' | 'always' | 'rate';
 
 /**
- * Simula um ERP externo com latência artificial e falha controlada.
+ * Simulates an external ERP with artificial latency and configurable failures.
  *
- * Comportamento configurado por variáveis de ambiente:
- *   ERP_FAILURE_MODE=never   → sempre sucesso (padrão, ideal para demo)
- *   ERP_FAILURE_MODE=always  → sempre falha (útil para testes manuais)
- *   ERP_FAILURE_MODE=rate    → falha probabilística
- *   ERP_LATENCY_MS           → latência artificial em ms
- *   ERP_TIMEOUT_MS           → timeout máximo da chamada
+ * Behaviour is controlled by environment variables:
+ *   ERP_FAILURE_MODE=never   — always succeeds (default, ideal for demo)
+ *   ERP_FAILURE_MODE=always  — always fails (useful for manual testing)
+ *   ERP_FAILURE_MODE=rate    — probabilistic failure
+ *   ERP_LATENCY_MS           — artificial delay in milliseconds
+ *   ERP_TIMEOUT_MS           — maximum call timeout
  *
- * Em testes E2E, o provider é sobrescrito via overrideProvider() para garantir
- * comportamento determinístico sem depender de Math.random() ou timers reais.
- *
- * Implementação completa (timeout real + compensação de estoque) chega na Fase 6.
+ * In E2E tests the provider is replaced via overrideProvider() to guarantee
+ * deterministic behaviour without relying on Math.random() or real timers.
  */
 @Injectable()
 export class FakeErpService {
   async processOrder(_orderId: string): Promise<void> {
-    // placeholder — implementação na Fase 6
+    // Full implementation with timeout and stock compensation arrives in Phase 6.
   }
 }
