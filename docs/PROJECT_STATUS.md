@@ -3,7 +3,19 @@
 > **Purpose:** Single source of truth for any AI assistant or developer picking up this project.
 > No prior conversation context is required to continue work from this document.
 >
-> **Last updated:** 2026-06-06 (Phase 8 + Frontend Polish) | **Author:** AI-assisted development session
+> **Last updated:** 2026-06-06 (Phase 12 — Final Documentation) | **Author:** AI-assisted development session
+
+---
+
+## Submission Status
+
+- **Project Status:** READY FOR SUBMISSION
+- **Last Completed Phase:** Phase 12 — Final Documentation
+- **Next Phase:** None
+
+All 12 phases are complete. The full stack runs with `docker compose up --build`. Code is
+English-only with 0 lint errors/warnings, 37/37 unit tests and 7/7 E2E tests green, and a
+clean `tsc` / `nest build` / `next build`.
 
 ---
 
@@ -71,9 +83,8 @@
 
 ### Testing strategy
 - **Unit tests** (Jest + `@nestjs/testing`): service logic, DTO validation, seed behaviour.
-- **E2E tests** (Supertest): 6 mandatory business scenarios — Phase 7.
+- **E2E tests** (Supertest): 6 mandatory business scenarios against a real MongoDB.
 - Dependencies mocked via `getModelToken` and `overrideProvider`; no in-memory database at unit level.
-- `mongodb-memory-server` planned for integration tests in Phase 7.
 
 ---
 
@@ -197,7 +208,7 @@
 
 ---
 
-## Pending Phases
+## Phase History (continued)
 
 ### Phase 6 — Atomic Stock Control ✅
 **Goal:** Prevent overselling using atomic MongoDB operations.
@@ -369,14 +380,25 @@
 
 ---
 
-### Phase 12 — Documentation
-**Goal:** Final README and ADRs ready for evaluator handoff.
+### Phase 12 — Final Documentation ✅
+**Goal:** Repository ready for technical evaluation and final delivery.
 
-**Expected deliverables:**
-- `README.md`: setup instructions, seed explanation, environment variables table, endpoint list, test commands, trade-offs section, future evolution paths.
-- Cloud deployment notes (AWS/Azure/GCP) — documented, not implemented.
-- `PROMPTS.md`: up to date with all session prompts.
-- `docs/ARCHITECTURE.md`: final architecture with flow diagram.
+**Deliverables:**
+- `README.md` rewritten as the primary entry point (English): project overview with
+  problem → solution mapping, architecture, key technical decisions, run instructions
+  (local + Docker), environment variables, API documentation, testing, trade-offs, and
+  future improvements.
+- `docs/ARCHITECTURE.md`: translated to English and extended with three Mermaid diagrams
+  (System Architecture, Checkout Flow, Cache Flow); corrected the ERP-failure outcome
+  (always HTTP 201 with `FAILED` status, not 503).
+- `docs/ADR-001-monolito-modular.md`: translated to English; clarified why a modular
+  monolith, why not microservices, and why it fits the challenge scope.
+- `docs/PROJECT_STATUS.md`: updated to READY FOR SUBMISSION; stale forward-looking
+  references removed.
+- `PROMPTS.md`: Phase 12 entry added.
+
+**Status:** ✅ Complete. Documentation matches the implementation; no business logic,
+tests, API contracts, or dependencies were changed.
 
 **Dependencies:** All phases complete.
 
@@ -506,24 +528,9 @@ The orders suite uses the `casecellshop-e2e` database and cleans up after itself
 
 ---
 
-## Recommended Next Step
-
-**Phase 7b — E2E Tests + ERP Integration**
-
-### Technical rationale
-With idempotency complete, the next step is to cover all 6 mandatory business scenarios with real integration/E2E tests using `mongodb-memory-server`, and to implement the `FakeErpService` (timeout + configurable failure + stock compensation → FAILED/503).
-
-### Expected outcomes after Phase 7b
-- Supertest E2E suite with all 6 business scenarios passing.
-- `FakeErpService` triggerable via `ERP_FAILURE_MODE=always` env var.
-- Stock compensation on ERP failure (atomic `$inc` to restore stock).
-- Order status transitions: `PENDING → PROCESSING → COMPLETED | FAILED`.
-
----
-
 ## Delivery Readiness
 
-### Already production-like
+### Production-like characteristics
 - Environment validation on boot (fail-fast, no silent misconfiguration).
 - Structured JSON logging (pino — production-grade).
 - `GET /api/health` with real dependency checks.
@@ -534,29 +541,20 @@ With idempotency complete, the next step is to cover all 6 mandatory business sc
 - Idempotency: `Idempotency-Key` header enforced; pre-check + E11000 deduplication.
 - ERP simulation: `FakeErpService` with latency/timeout/failure modes; stock compensation on failure.
 - Full order lifecycle: `PENDING → PROCESSING → COMPLETED | FAILED`.
-- Frontend MVP: product grid, quantity selector, checkout with idempotency, all error states (400/404/409/5xx), order confirmation with ID and status.
-- Frontend Polish: pt-BR localization, ARIA attributes (`role="alert"`, `role="status"`, `aria-busy`, `aria-live`, `aria-label`), improved input contrast, `lang="pt-BR"`, updated metadata, unused public assets removed.
+- Frontend: product grid, quantity selector, checkout with idempotency, all error states (400/404/409/5xx), order confirmation with ID and status; pt-BR UI with ARIA attributes.
+- Documentation: README, ARCHITECTURE (with diagrams), and ADR-001 finalised in English.
 
-### Still missing for a complete delivery
-- Final README with cloud deployment notes (Phase 12).
-
-### Main risks
-1. **Stock compensation is non-transactional** — In the absence of a replica set, `$inc` on ERP failure is best-effort; a crash between the ERP call and the compensation creates a stock inconsistency. Documented as a known trade-off.
-2. **Disk space** — Previous sessions hit 100% disk usage during npm installs. Monitor when adding new packages.
-
-### Recommended execution order
-1. Phase 6 (stock + idempotency + ERP) — core checkout correctness.
-2. Phase 7 (E2E + concurrency) — validates Phase 6 under all scenarios.
-3. Phase 8 (frontend storefront) — can start in parallel with Phase 7.
-4. Phase 9 (frontend checkout) — depends on Phase 6 being complete.
-5. Phase 11 (production Docker) — final packaging.
-6. Phase 10 (Redis cache, bonus) — only if time allows.
-7. Phase 12 (documentation) — finalise README and ADRs last.
+### Main risk
+- **Stock compensation is non-transactional** — without a replica set, `$inc` on ERP
+  failure is best-effort; a crash between the ERP call and the compensation could create a
+  stock inconsistency. Documented as a known trade-off (see Known Limitations and ADR-001).
 
 ---
 
 ## Current Progress
 
-**Last Completed Phase:** Phase 11 — Production Dockerfiles
+**Project Status:** READY FOR SUBMISSION
 
-**Next Phase:** Phase 12 — Final Documentation
+**Last Completed Phase:** Phase 12 — Final Documentation
+
+**Next Phase:** None

@@ -316,3 +316,44 @@ Este arquivo registra os prompts relevantes utilizados durante o desenvolvimento
 - `POST /api/orders`: pedido criado com status `COMPLETED`, stock decrementado.
 - `GET http://localhost:3000`: frontend servindo HTML.
 - Startup único: `docker compose up --build`.
+
+---
+
+## Phase 12 — Final Documentation & Submission Readiness
+
+**Prompt:** Implement Phase 12 — Final Documentation & Submission Readiness. Prepare the
+repository for technical evaluation. No new features, no business-logic changes, no test
+changes, no API-contract changes, no new dependencies. Documentation must be English-only,
+concise, professional, and consistent. Rewrite the README as the primary entry point
+(Project Overview with problem → solution mapping, Architecture, Key Technical Decisions,
+Running the Project, Environment Variables, API Documentation, Testing, Trade-offs, Future
+Improvements). Add Mermaid diagrams to `docs/ARCHITECTURE.md` (System Architecture,
+Checkout Flow, Cache Flow). Review ADR-001. Update PROJECT_STATUS to READY FOR SUBMISSION.
+Clean up stale references. Validate docs against the implementation.
+
+**Result:**
+- `README.md` — rewritten in English as the primary entry point with all required
+  sections and the explicit Problem 1 → Redis Cache / Problem 2 → Atomic Stock Control /
+  Problem 3 → ERP Resilience + Compensation mapping. Commands verified against
+  `package.json`, `docker-compose.yml`, and `.env.example`.
+- `docs/ARCHITECTURE.md` — translated to English; added three Mermaid diagrams; corrected
+  the ERP-failure outcome to HTTP 201 with `FAILED` status (the implementation never
+  returns 503 for ERP failure).
+- `docs/ADR-001-monolito-modular.md` — translated to English; clarified why a modular
+  monolith, why not microservices, and why it fits the challenge scope.
+- `docs/PROJECT_STATUS.md` — added a Submission Status block (READY FOR SUBMISSION / Phase
+  12 / None); marked Phase 12 complete; removed stale forward-looking sections
+  (`mongodb-memory-server` plan, "Recommended Next Step: Phase 7b", "Recommended execution
+  order", "Still missing" item).
+- `PROMPTS.md` — this entry added.
+
+**Decisions:**
+- Kept the historical phase log in `PROJECT_STATUS.md` and the prior Portuguese prompt
+  entries as a development record; only stale forward-looking planning was removed.
+- No source code, tests, API contracts, or dependencies were modified.
+
+**Validation:**
+- README, ARCHITECTURE, ADR, and env tables cross-checked against `main.ts`,
+  `env.validation.ts`, `orders.service.ts`, `orders.controller.ts`,
+  `products.service.ts`, `fake-erp.service.ts`, `docker-compose.yml`, `package.json`, and
+  `.env.example`.
