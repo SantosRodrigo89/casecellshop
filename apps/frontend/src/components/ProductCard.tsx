@@ -14,17 +14,34 @@ type CheckoutState =
   | { type: 'success'; order: Order }
   | { type: 'error'; message: string };
 
+const cardStyle: React.CSSProperties = {
+  border: '1px solid #e5e7eb',
+  borderRadius: '8px',
+  padding: '24px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '16px',
+  backgroundColor: '#ffffff',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+};
+
+const detailTextStyle: React.CSSProperties = {
+  fontSize: '0.8rem',
+  color: '#374151',
+  margin: '0 0 2px 0',
+};
+
 function getErrorMessage(err: unknown): string {
   const e = err as ApiError;
   switch (e.status) {
     case 400:
-      return 'Invalid request. Please check the quantity.';
+      return 'Requisição inválida. Verifique a quantidade informada.';
     case 404:
-      return 'Product not found.';
+      return 'Produto não encontrado.';
     case 409:
-      return 'Insufficient stock for this product.';
+      return 'Estoque insuficiente para este produto.';
     default:
-      return 'Temporary processing failure. Please try again later.';
+      return 'Falha temporária no processamento. Tente novamente em instantes.';
   }
 }
 
@@ -33,6 +50,7 @@ export default function ProductCard({ product }: Props) {
   const [state, setState] = useState<CheckoutState>({ type: 'idle' });
 
   const isLoading = state.type === 'loading';
+  const outOfStock = product.stock === 0;
 
   async function handleBuy() {
     setState({ type: 'loading' });
@@ -57,26 +75,15 @@ export default function ProductCard({ product }: Props) {
     setQuantity(1);
   }
 
-  const outOfStock = product.stock === 0;
+  const isCompleted = state.type === 'success' && state.order.status === 'COMPLETED';
 
   return (
-    <div
-      style={{
-        border: '1px solid #e5e7eb',
-        borderRadius: '8px',
-        padding: '24px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '16px',
-        backgroundColor: '#ffffff',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-      }}
-    >
+    <article aria-label={`Produto: ${product.name}`} style={cardStyle}>
       {product.imageUrl && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={product.imageUrl}
-          alt={product.name}
+          alt={`Foto de ${product.name}`}
           style={{
             width: '100%',
             height: '180px',
@@ -91,18 +98,27 @@ export default function ProductCard({ product }: Props) {
         <h2 style={{ fontSize: '1.125rem', fontWeight: 600, margin: '0 0 4px 0', color: '#111827' }}>
           {product.name}
         </h2>
-        <p style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 4px 0', color: '#111827' }}>
+        <p
+          aria-label={`Preço: R$ ${product.price.toFixed(2)}`}
+          style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 4px 0', color: '#111827' }}
+        >
           R$ {product.price.toFixed(2)}
         </p>
-        <p style={{ fontSize: '0.875rem', color: outOfStock ? '#ef4444' : '#6b7280', margin: 0 }}>
-          {outOfStock ? 'Out of stock' : `${product.stock} in stock`}
+        <p
+          aria-live="polite"
+          style={{ fontSize: '0.875rem', color: outOfStock ? '#ef4444' : '#6b7280', margin: 0 }}
+        >
+          {outOfStock ? 'Sem estoque' : `${product.stock} em estoque`}
         </p>
       </div>
 
       {state.type !== 'success' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <label htmlFor={`qty-${product.id}`} style={{ fontSize: '0.875rem', color: '#374151' }}>
-            Qty:
+          <label
+            htmlFor={`qty-${product.id}`}
+            style={{ fontSize: '0.875rem', color: '#374151', fontWeight: 500 }}
+          >
+            Quantidade:
           </label>
           <input
             id={`qty-${product.id}`}
@@ -112,13 +128,19 @@ export default function ProductCard({ product }: Props) {
             value={quantity}
             onChange={handleQuantityChange}
             disabled={isLoading || outOfStock}
+            aria-label={`Quantidade de ${product.name}`}
+            aria-disabled={isLoading || outOfStock}
             style={{
               width: '70px',
               padding: '6px 10px',
-              border: '1px solid #d1d5db',
+              border: '2px solid #6b7280',
               borderRadius: '6px',
-              fontSize: '0.875rem',
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              color: '#111827',
               textAlign: 'center',
+              backgroundColor: isLoading || outOfStock ? '#f3f4f6' : '#ffffff',
+              outline: 'none',
             }}
           />
         </div>
@@ -128,6 +150,15 @@ export default function ProductCard({ product }: Props) {
         <button
           onClick={handleBuy}
           disabled={isLoading || outOfStock}
+          aria-busy={isLoading}
+          aria-disabled={isLoading || outOfStock}
+          aria-label={
+            isLoading
+              ? `Processando compra de ${product.name}`
+              : outOfStock
+                ? `${product.name} sem estoque`
+                : `Comprar ${product.name}`
+          }
           style={{
             padding: '10px 0',
             borderRadius: '6px',
@@ -140,12 +171,14 @@ export default function ProductCard({ product }: Props) {
             transition: 'background-color 0.15s',
           }}
         >
-          {isLoading ? 'Processing…' : outOfStock ? 'Out of Stock' : 'Buy Now'}
+          {isLoading ? 'Processando…' : outOfStock ? 'Sem estoque' : 'Comprar'}
         </button>
       )}
 
       {state.type === 'error' && (
         <div
+          role="alert"
+          aria-live="assertive"
           style={{
             padding: '10px 14px',
             borderRadius: '6px',
@@ -161,11 +194,14 @@ export default function ProductCard({ product }: Props) {
 
       {state.type === 'success' && (
         <div
+          role="status"
+          aria-live="polite"
+          aria-label={isCompleted ? 'Pedido confirmado' : 'Pedido processado com ressalvas'}
           style={{
             padding: '14px',
             borderRadius: '6px',
-            backgroundColor: state.order.status === 'COMPLETED' ? '#f0fdf4' : '#fffbeb',
-            border: `1px solid ${state.order.status === 'COMPLETED' ? '#bbf7d0' : '#fde68a'}`,
+            backgroundColor: isCompleted ? '#f0fdf4' : '#fffbeb',
+            border: `1px solid ${isCompleted ? '#bbf7d0' : '#fde68a'}`,
           }}
         >
           <p
@@ -173,27 +209,28 @@ export default function ProductCard({ product }: Props) {
               fontWeight: 700,
               fontSize: '0.875rem',
               margin: '0 0 6px 0',
-              color: state.order.status === 'COMPLETED' ? '#15803d' : '#b45309',
+              color: isCompleted ? '#15803d' : '#b45309',
             }}
           >
-            {state.order.status === 'COMPLETED' ? '✓ Order confirmed!' : '⚠ Order processed with issues'}
+            {isCompleted ? '✓ Pedido confirmado!' : '⚠ Pedido processado com ressalvas'}
           </p>
-          <p style={{ fontSize: '0.8rem', color: '#374151', margin: '0 0 2px 0' }}>
-            <strong>Order ID:</strong> {state.order.id}
+          <p style={detailTextStyle}>
+            <strong>ID do pedido:</strong> {state.order.id}
           </p>
-          <p style={{ fontSize: '0.8rem', color: '#374151', margin: '0 0 2px 0' }}>
+          <p style={detailTextStyle}>
             <strong>Status:</strong> {state.order.status}
           </p>
-          <p style={{ fontSize: '0.8rem', color: '#374151', margin: '0 0 2px 0' }}>
+          <p style={detailTextStyle}>
             <strong>Total:</strong> R$ {state.order.total.toFixed(2)}
           </p>
           {state.order.failureReason && (
-            <p style={{ fontSize: '0.8rem', color: '#b45309', margin: '4px 0 0 0' }}>
-              <strong>Reason:</strong> {state.order.failureReason}
+            <p style={{ ...detailTextStyle, color: '#b45309', marginTop: '4px' }}>
+              <strong>Motivo:</strong> {state.order.failureReason}
             </p>
           )}
           <button
             onClick={handleReset}
+            aria-label={`Comprar ${product.name} novamente`}
             style={{
               marginTop: '10px',
               padding: '6px 12px',
@@ -205,10 +242,10 @@ export default function ProductCard({ product }: Props) {
               cursor: 'pointer',
             }}
           >
-            Buy again
+            Comprar novamente
           </button>
         </div>
       )}
-    </div>
+    </article>
   );
 }

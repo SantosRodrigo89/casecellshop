@@ -3,7 +3,7 @@
 > **Purpose:** Single source of truth for any AI assistant or developer picking up this project.
 > No prior conversation context is required to continue work from this document.
 >
-> **Last updated:** 2026-06-06 (Phase 11) | **Author:** AI-assisted development session
+> **Last updated:** 2026-06-06 (Phase 8 + Frontend Polish) | **Author:** AI-assisted development session
 
 ---
 
@@ -535,6 +535,7 @@ With idempotency complete, the next step is to cover all 6 mandatory business sc
 - ERP simulation: `FakeErpService` with latency/timeout/failure modes; stock compensation on failure.
 - Full order lifecycle: `PENDING → PROCESSING → COMPLETED | FAILED`.
 - Frontend MVP: product grid, quantity selector, checkout with idempotency, all error states (400/404/409/5xx), order confirmation with ID and status.
+- Frontend Polish: pt-BR localization, ARIA attributes (`role="alert"`, `role="status"`, `aria-busy`, `aria-live`, `aria-label`), improved input contrast, `lang="pt-BR"`, updated metadata, unused public assets removed.
 
 ### Still missing for a complete delivery
 - Final README with cloud deployment notes (Phase 12).

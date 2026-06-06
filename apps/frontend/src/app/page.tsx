@@ -14,13 +14,14 @@ export default function HomePage() {
     api.products
       .list()
       .then(setProducts)
-      .catch(() => setError('Failed to load products. Make sure the backend is running.'))
+      .catch(() => setError('Não foi possível carregar os produtos. Verifique se o servidor está em execução.'))
       .finally(() => setLoading(false));
   }, []);
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
       <header
+        role="banner"
         style={{
           backgroundColor: '#111827',
           color: '#ffffff',
@@ -30,27 +31,37 @@ export default function HomePage() {
           alignItems: 'center',
         }}
       >
-        <span style={{ fontWeight: 700, fontSize: '1.125rem', letterSpacing: '-0.01em' }}>
+        <span
+          aria-label="CaseCellShop — página inicial"
+          style={{ fontWeight: 700, fontSize: '1.125rem', letterSpacing: '-0.01em' }}
+        >
           CaseCellShop
         </span>
       </header>
 
       <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 24px' }}>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', marginBottom: '8px' }}>
-          Phone Cases
+          Capinhas para Celular
         </h1>
         <p style={{ color: '#6b7280', marginBottom: '32px', fontSize: '0.875rem' }}>
-          Choose your phone case and complete your order in seconds.
+          Escolha sua capinha e finalize sua compra em segundos.
         </p>
 
         {loading && (
-          <div style={{ textAlign: 'center', padding: '64px 0', color: '#6b7280' }}>
-            Loading products…
+          <div
+            role="status"
+            aria-live="polite"
+            aria-label="Carregando produtos"
+            style={{ textAlign: 'center', padding: '64px 0', color: '#6b7280' }}
+          >
+            Carregando produtos…
           </div>
         )}
 
         {error && (
           <div
+            role="alert"
+            aria-live="assertive"
             style={{
               padding: '16px 20px',
               borderRadius: '8px',
@@ -65,13 +76,17 @@ export default function HomePage() {
         )}
 
         {!loading && !error && products.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '64px 0', color: '#6b7280' }}>
-            No products available.
+          <div
+            role="status"
+            style={{ textAlign: 'center', padding: '64px 0', color: '#6b7280' }}
+          >
+            Nenhum produto disponível.
           </div>
         )}
 
         {!loading && !error && products.length > 0 && (
           <div
+            aria-label="Lista de produtos"
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',

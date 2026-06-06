@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CaseCellShop",
-  description: "Phone case store — fast and reliable checkout",
+  title: "CaseCellShop | Checkout Resiliente",
+  description:
+    "Loja de capinhas para celular com checkout confiável: controle de estoque em tempo real, idempotência e resiliência a falhas.",
 };
 
 export default function RootLayout({
@@ -24,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="pt-BR"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
