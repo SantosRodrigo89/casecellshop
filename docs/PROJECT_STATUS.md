@@ -191,21 +191,41 @@
 
 ## Pending Phases
 
-### Phase 6 — ERP Integration + Stock Control + Idempotency
-**Goal:** Complete the checkout flow with all business rules.
+### Phase 6 — Atomic Stock Control ✅
+**Goal:** Prevent overselling using atomic MongoDB operations.
 
-**Expected deliverables:**
-- Atomic stock decrement: `findOneAndUpdate({ _id, stock: { $gte: quantity } }, { $inc: { stock: -quantity } })` — returns `null` → HTTP 409 (no overselling).
-- Idempotency: enforce `Idempotency-Key` header on `POST /api/orders`; catch `E11000` (unique index violation) → return the existing order. Replace the UUID placeholder with the actual header value.
-- `FakeErpService` full implementation: artificial latency (`ERP_LATENCY_MS`), configurable failure mode (`ERP_FAILURE_MODE`), call timeout (`ERP_TIMEOUT_MS`).
-- ERP failure path: compensate stock (`$inc: { stock: +quantity }`) → set order status to `FAILED` → return HTTP 503.
-- Order state machine: `PENDING → PROCESSING → COMPLETED | FAILED`.
+**Deliverables:**
+- `ProductsService.decrementStock(id, quantity)`: single atomic `findOneAndUpdate({ _id, stock: { $gte: quantity } }, { $inc: { stock: -quantity } })` — returns the pre-update document on success, `null` when stock is insufficient.
+- `OrdersService.create()` updated: (1) validate product → 404; (2) atomic decrement → 409 `ConflictException`; (3) create order → 201 PENDING.
+- `ConflictException` (HTTP 409) with clear English message: `"Insufficient stock for product: <id>"`.
+- `@ApiConflictResponse` documented in Swagger.
+- `OrderResponseDto` descriptions updated to English.
+- Unit tests: success + stock decrement verified, 404 (product not found), 409 (insufficient stock), concurrency simulation (10 requests, stock=5, exactly 5 succeed, stock=0 after).
+
+**Not implemented in this phase (deferred):**
+- Idempotency (`Idempotency-Key` header and duplicate order detection).
+- ERP integration (`FakeErpService` and failure compensation).
+
+**Status:** ✅ Complete. 0 lint errors, 0 lint warnings, 27/27 tests pass, `tsc` clean.
 
 **Dependencies:** Phase 5 complete.
 
 ---
 
-### Phase 7 — E2E Tests + Concurrency
+### Phase 7 — Idempotency
+**Goal:** Enforce `Idempotency-Key` header on `POST /api/orders`; deduplicate concurrent retries.
+
+**Expected deliverables:**
+- Validate `Idempotency-Key` header on `POST /api/orders` — 400 if missing.
+- Catch `E11000` (MongoDB unique index violation on `orders.idempotencyKey`) → return the existing order (no duplicate created).
+- Replace the `randomUUID()` placeholder with the actual header value.
+- Unit + E2E tests for duplicate-key scenario.
+
+**Dependencies:** Phase 6 complete.
+
+---
+
+### Phase 7b — E2E Tests + Concurrency (was Phase 7)
 **Goal:** Cover all 6 mandatory business scenarios with integration/E2E tests.
 
 **Expected deliverables:**
@@ -335,7 +355,7 @@ The API is documented from Phase 3. Every new endpoint added its Swagger decorat
 
 ## Existing Tests
 
-### Unit tests (22 passing, 4 suites)
+### Unit tests (27 passing, 4 suites)
 
 **HealthController** (`health.controller.spec.ts`)
 - `should be defined`
@@ -347,6 +367,9 @@ The API is documented from Phase 3. Every new endpoint added its Swagger decorat
 - `findAll() > should call find().sort({ name: 1 }).exec()`
 - `findById() > should return null for an invalid ObjectId`
 - `findById() > should query the model with a valid ObjectId`
+- `decrementStock() > should return null for an invalid ObjectId without querying the model`
+- `decrementStock() > should return the pre-update document when stock is sufficient`
+- `decrementStock() > should return null when stock is insufficient (model returns null)`
 
 **ProductsSeedService** (`products-seed.service.spec.ts`)
 - `should be defined`
@@ -361,8 +384,10 @@ The API is documented from Phase 3. Every new endpoint added its Swagger decorat
 - `CreateOrderDto > should fail when quantity is less than 1`
 - `CreateOrderDto > should fail when quantity is not an integer`
 - `CreateOrderDto > should pass with valid data`
-- `create() > should return a PENDING order with the correct total`
+- `create() > should atomically decrement stock and return a PENDING order with the correct total`
 - `create() > should throw NotFoundException when the product does not exist`
+- `create() > should throw ConflictException when stock is insufficient`
+- `create() - overselling prevention > should allow exactly 5 of 10 concurrent requests when stock=5`
 - `findOne() > should return the order when found`
 - `findOne() > should throw NotFoundException when the order does not exist`
 - `findOne() > should throw NotFoundException for an invalid ObjectId`
@@ -380,10 +405,9 @@ The 6 mandatory business-scenario E2E tests arrive in Phase 7.
 
 | Limitation | Reason | Resolution |
 |---|---|---|
-| No stock reservation on `POST /api/orders` | Phase 5 scope — atomic decrement is Phase 6 | Phase 6 |
-| `idempotencyKey` is a random UUID, not from request header | Placeholder — real idempotency logic is Phase 6 | Phase 6 |
-| No ERP call in `POST /api/orders` | `FakeErpService` is a stub — Phase 6 | Phase 6 |
-| Stock compensation not implemented | Depends on ERP + stock decrement | Phase 6 |
+| `idempotencyKey` is a random UUID, not from request header | Placeholder — real idempotency logic is Phase 7 | Phase 7 |
+| No ERP call in `POST /api/orders` | `FakeErpService` is a stub — Phase 7 | Phase 7 |
+| Stock compensation not implemented | Depends on ERP integration | Phase 7 |
 | No frontend implementation | Phase 8 and 9 | Phase 8–9 |
 | E2E test suite incomplete | Only bootstrap test exists | Phase 7 |
 | No concurrency test | Requires full checkout flow | Phase 7 |
@@ -395,19 +419,15 @@ The 6 mandatory business-scenario E2E tests arrive in Phase 7.
 
 ## Recommended Next Step
 
-**Phase 6 — ERP + Stock Control + Idempotency**
+**Phase 7 — Idempotency**
 
 ### Technical rationale
-Phase 6 closes the three core architectural gaps that make the checkout non-functional today: stock goes unchecked, duplicate orders are not deduplicated, and the ERP is never called. These are the primary evaluation criteria for the challenge. All three are tightly coupled (the ERP call happens *after* stock decrement, and compensation happens *on ERP failure*), so they must be implemented together.
+Phase 7 deduplicates checkout retries: the `Idempotency-Key` header becomes mandatory on `POST /api/orders`, and a MongoDB `E11000` collision returns the existing order rather than creating a duplicate. This closes the last gap before ERP integration.
 
-### Business rationale
-The evaluator will test the three hardest scenarios: out-of-stock (409), duplicate request (idempotency), and ERP timeout with stock rollback (503). Without Phase 6, none of these work.
-
-### Expected outcomes after Phase 6
-- `POST /api/orders` with depleted stock → HTTP 409, no order created.
-- Repeated `POST /api/orders` with the same `Idempotency-Key` → same order returned, no duplicate.
-- ERP timeout or failure → HTTP 503, stock restored, order marked `FAILED`.
-- Order status progresses: `PENDING → PROCESSING → COMPLETED | FAILED`.
+### Expected outcomes after Phase 7
+- `POST /api/orders` without `Idempotency-Key` header → HTTP 400.
+- Repeated `POST /api/orders` with the same `Idempotency-Key` → same order returned (no duplicate created).
+- Unit + E2E tests for duplicate-key scenario.
 
 ---
 
@@ -420,11 +440,11 @@ The evaluator will test the three hardest scenarios: out-of-stock (409), duplica
 - MongoDB unique indexes defined on `slug` (products) and `idempotencyKey` (orders).
 - Docker Compose with healthchecks and persistent volumes.
 - Swagger with full request/response schemas.
-- Code: English-only, 0 lint errors/warnings, 22/22 tests green, `tsc` clean.
+- Code: English-only, 0 lint errors/warnings, 27/27 tests green, `tsc` clean.
 
 ### Still missing for a complete delivery
-- Stock atomic decrement + idempotency header + ERP simulation (Phase 6).
-- 6 mandatory E2E scenarios + concurrency test (Phase 7).
+- Idempotency header + ERP simulation (Phase 7).
+- 6 mandatory E2E scenarios (Phase 7b).
 - Frontend UI (Phase 8–9).
 - Production Dockerfiles + full-stack compose (Phase 11).
 - Final README with cloud deployment notes (Phase 12).
@@ -447,19 +467,12 @@ The evaluator will test the three hardest scenarios: out-of-stock (409), duplica
 
 ## Current Progress
 
-**Last Completed Phase:** Phase 5 — Orders Core
+**Last Completed Phase:** Phase 6 — Atomic Stock Control
 
-**Next Phase:** Phase 6 — Atomic Stock Control
+**Next Phase:** Phase 7 — Idempotency
 
-**Phase Objective:** Prevent overselling using atomic MongoDB operations.
-
-**Expected Deliverables:**
-- Stock validation before order creation
-- Atomic stock decrement via `findOneAndUpdate` with `$gte` condition
-- Insufficient stock handling (HTTP 409)
-- Concurrency tests for simultaneous purchase attempts
+**Phase 7 Objective:** Enforce `Idempotency-Key` header on `POST /api/orders` and deduplicate retries using the MongoDB unique index on `orders.idempotencyKey`.
 
 **Do Not Start:**
-- Idempotency (`Idempotency-Key` header and duplicate order detection)
 - ERP integration (`FakeErpService` implementation and failure compensation)
 - Frontend (Phase 8 and 9)

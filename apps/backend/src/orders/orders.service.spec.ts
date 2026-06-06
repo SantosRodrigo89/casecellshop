@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { validate } from 'class-validator';
@@ -27,6 +27,7 @@ describe('OrdersService', () => {
 
   const mockProductsService = {
     findById: jest.fn(),
+    decrementStock: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -96,13 +97,14 @@ describe('OrdersService', () => {
   // ─── create() ────────────────────────────────────────────────────────────
 
   describe('create()', () => {
-    it('should return a PENDING order with the correct total', async () => {
+    it('should atomically decrement stock and return a PENDING order with the correct total', async () => {
       const dto: CreateOrderDto = { productId: VALID_PRODUCT_ID, quantity: 2 };
       const expectedTotal = parseFloat(
         (mockProduct.price * dto.quantity).toFixed(2),
       );
 
       mockProductsService.findById.mockResolvedValue(mockProduct);
+      mockProductsService.decrementStock.mockResolvedValue(mockProduct);
       mockOrderModel.create.mockResolvedValue({
         id: 'order-id-1',
         productId: VALID_PRODUCT_ID,
@@ -117,6 +119,10 @@ describe('OrdersService', () => {
 
       expect(mockProductsService.findById).toHaveBeenCalledWith(
         VALID_PRODUCT_ID,
+      );
+      expect(mockProductsService.decrementStock).toHaveBeenCalledWith(
+        VALID_PRODUCT_ID,
+        dto.quantity,
       );
       expect(mockOrderModel.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -137,7 +143,65 @@ describe('OrdersService', () => {
         service.create({ productId: VALID_PRODUCT_ID, quantity: 1 }),
       ).rejects.toThrow(NotFoundException);
 
+      expect(mockProductsService.decrementStock).not.toHaveBeenCalled();
       expect(mockOrderModel.create).not.toHaveBeenCalled();
+    });
+
+    it('should throw ConflictException when stock is insufficient', async () => {
+      mockProductsService.findById.mockResolvedValue(mockProduct);
+      mockProductsService.decrementStock.mockResolvedValue(null);
+
+      await expect(
+        service.create({ productId: VALID_PRODUCT_ID, quantity: 999 }),
+      ).rejects.toThrow(ConflictException);
+
+      expect(mockOrderModel.create).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── create() - concurrency simulation ───────────────────────────────────
+
+  describe('create() - overselling prevention', () => {
+    it('should allow exactly 5 of 10 concurrent requests when stock=5', async () => {
+      const dto: CreateOrderDto = { productId: VALID_PRODUCT_ID, quantity: 1 };
+      let stockRemaining = 5;
+
+      mockProductsService.findById.mockResolvedValue({
+        ...mockProduct,
+        stock: 5,
+      });
+
+      // Simulates MongoDB's atomic findOneAndUpdate behaviour:
+      // each call either reserves one unit or returns null when exhausted.
+      mockProductsService.decrementStock.mockImplementation(
+        (_id: string, qty: number) => {
+          if (stockRemaining >= qty) {
+            stockRemaining -= qty;
+            return Promise.resolve({
+              ...mockProduct,
+              stock: stockRemaining + qty,
+            });
+          }
+          return Promise.resolve(null);
+        },
+      );
+
+      mockOrderModel.create.mockImplementation((doc: Record<string, unknown>) =>
+        Promise.resolve({ id: `order-${Math.random()}`, ...doc }),
+      );
+
+      const results = await Promise.allSettled(
+        Array.from({ length: 10 }, () => service.create(dto)),
+      );
+
+      const succeeded = results.filter((r) => r.status === 'fulfilled');
+      const failedWithConflict = results.filter(
+        (r) => r.status === 'rejected' && r.reason instanceof ConflictException,
+      );
+
+      expect(succeeded).toHaveLength(5);
+      expect(failedWithConflict).toHaveLength(5);
+      expect(stockRemaining).toBe(0);
     });
   });
 

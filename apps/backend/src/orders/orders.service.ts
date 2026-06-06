@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Model } from 'mongoose';
 import { randomUUID } from 'crypto';
@@ -17,6 +21,16 @@ export class OrdersService {
     const product = await this.productsService.findById(dto.productId);
     if (!product) {
       throw new NotFoundException(`Product not found: ${dto.productId}`);
+    }
+
+    const reserved = await this.productsService.decrementStock(
+      dto.productId,
+      dto.quantity,
+    );
+    if (!reserved) {
+      throw new ConflictException(
+        `Insufficient stock for product: ${dto.productId}`,
+      );
     }
 
     const unitPrice = product.price;

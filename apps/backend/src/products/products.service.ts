@@ -18,4 +18,22 @@ export class ProductsService {
     if (!isValidObjectId(id)) return null;
     return this.productModel.findById(id).exec();
   }
+
+  /**
+   * Atomically decrements stock by `quantity` only when enough stock is available.
+   * Returns the pre-update document on success, or null when stock < quantity.
+   * A single findOneAndUpdate call prevents overselling under concurrent requests.
+   */
+  async decrementStock(
+    id: string,
+    quantity: number,
+  ): Promise<ProductDocument | null> {
+    if (!isValidObjectId(id)) return null;
+    return this.productModel
+      .findOneAndUpdate(
+        { _id: id, stock: { $gte: quantity } },
+        { $inc: { stock: -quantity } },
+      )
+      .exec();
+  }
 }

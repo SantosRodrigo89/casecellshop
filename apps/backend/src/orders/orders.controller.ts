@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -39,6 +40,10 @@ export class OrdersController {
     description: 'Invalid request body — productId or quantity is incorrect.',
   })
   @ApiNotFoundResponse({ description: 'Product not found.' })
+  @ApiConflictResponse({
+    description:
+      'Insufficient stock — the requested quantity exceeds available stock.',
+  })
   create(@Body() dto: CreateOrderDto) {
     return this.ordersService.create(dto);
   }

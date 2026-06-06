@@ -68,10 +68,26 @@ npm run dev:frontend    # http://localhost:3000
 
 ## Endpoints
 
-- `GET /api/health` — healthcheck agregando MongoDB e Redis (via `@nestjs/terminus`).
-- `GET /api/docs` — documentação Swagger/OpenAPI interativa.
-- `GET /api/products` — vitrine (Fase 4).
-- `POST /api/orders` + `GET /api/orders/:id` — checkout (Fase 5).
+| Method | Route | Purpose |
+|--------|-------|---------|
+| `GET` | `/api/health` | Health check: MongoDB + Redis via `@nestjs/terminus` |
+| `GET` | `/api/docs` | Swagger UI — interactive API documentation |
+| `GET` | `/api/products` | Product catalogue, sorted by name |
+| `POST` | `/api/orders` | Create order — validates product, atomically decrements stock (409 if insufficient), returns `PENDING` order |
+| `GET` | `/api/orders/:id` | Get order by ID |
+
+### Stock control (Phase 6)
+
+`POST /api/orders` uses a single atomic MongoDB operation to prevent overselling:
+
+```
+findOneAndUpdate(
+  { _id: productId, stock: { $gte: quantity } },
+  { $inc: { stock: -quantity } }
+)
+```
+
+If the operation returns `null` (stock is less than the requested quantity), the endpoint responds with **HTTP 409 Conflict** and no order is created.
 
 ### Exemplo de healthcheck
 
@@ -101,10 +117,15 @@ npm run dev:frontend    # http://localhost:3000
 | `npm run lint`            | Lint de backend e frontend            |
 | `npm run build`           | Build de produção dos dois apps       |
 
-## Testes
+## Tests
 
-- Unitários: `npm test`
-- E2E (requer `docker compose up`): `npm run test:e2e`
+- Unit tests: `npm test` — 27 tests, 4 suites (health, products, seed, orders)
+- E2E (requires `docker compose up`): `npm run test:e2e`
+
+Key unit test highlights after Phase 6:
+- `create() > should atomically decrement stock and return a PENDING order`
+- `create() > should throw ConflictException when stock is insufficient`
+- `create() - overselling prevention > should allow exactly 5 of 10 concurrent requests when stock=5`
 
 ## Arquitetura e decisões
 

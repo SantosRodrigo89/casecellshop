@@ -138,3 +138,28 @@ Este arquivo registra os prompts relevantes utilizados durante o desenvolvimento
 - Redução atômica de estoque (`findOneAndUpdate` com `$gte`)
 - Idempotência real (header `Idempotency-Key` + índice único + deduplicação)
 - `FakeErpService` (timeout + falha) + compensação de estoque + status FAILED/503
+
+---
+
+## Fase 6 — Atomic Stock Control
+
+**Prompt:** Implement Phase 6 — Atomic Stock Control only. No idempotency, no ERP integration, no Redis, no frontend. Requirements: stock validation before order creation, atomic MongoDB `findOneAndUpdate` with `$gte` + `$inc` to prevent overselling, HTTP 409 ConflictException with clear English message when stock is insufficient, Swagger documentation for 409 and 404 responses, unit tests for success/409/404 and a concurrency simulation test (10 requests, stock=5, exactly 5 succeed).
+
+**Resultado:**
+- `products/products.service.ts` — adicionado `decrementStock(id, quantity)`: `findOneAndUpdate({ _id, stock: { $gte: quantity } }, { $inc: { stock: -quantity } })`. Retorna o documento anterior ao update (com preço correto) em caso de sucesso, `null` se estoque insuficiente.
+- `orders/orders.service.ts` — `create()` atualizado: (1) `findById` → 404; (2) `decrementStock` → 409 `ConflictException`; (3) cria o pedido; (4) retorna com status `PENDING`.
+- `orders/orders.controller.ts` — adicionado `@ApiConflictResponse` ao Swagger.
+- `orders/dto/order-response.dto.ts` — descrições atualizadas para inglês.
+- `products/products.service.spec.ts` — 3 novos testes para `decrementStock` (ObjectId inválido, estoque suficiente, estoque insuficiente).
+- `orders/orders.service.spec.ts` — testes atualizados: (1) sucesso com decremento atômico verificado; (2) 404 produto não encontrado (`decrementStock` não chamado); (3) 409 estoque insuficiente (`create` não chamado); (4) simulação de concorrência — 10 requisições simultâneas, stock=5, exatamente 5 bem-sucedidas, stock final = 0.
+
+**Decisões:**
+- `decrementStock` em `ProductsService` (não em `OrdersService`): mantém o modelo de produto encapsulado no módulo correto.
+- `findById` antes de `decrementStock`: distingue 404 (produto inexistente) de 409 (estoque insuficiente) com mensagens claras — sem race condition relevante porque produtos não são deletados.
+- Mocks síncronos via `Promise.resolve` no teste de concorrência: JavaScript é single-threaded; o teste demonstra a lógica correta (5 reservas, 5 rejeições) sem necessidade de banco real.
+- Banco real com `mongodb-memory-server` planejado para Fase 7b (testes de integração E2E).
+
+**Validação:**
+- `npm run lint`: 0 erros, 0 warnings
+- `npm test`: 27/27 verdes (5 novos testes adicionados)
+- `tsc --noEmit`: limpo
