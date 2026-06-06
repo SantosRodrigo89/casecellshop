@@ -1,13 +1,43 @@
 import { Module, Global } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MongooseModule } from '@nestjs/mongoose';
+import { LoggerModule } from 'nestjs-pino';
+import { envConfig } from '../config/env.config';
+import { validateEnv } from '../config/env.validation';
+import { RedisProvider } from './redis.provider';
 
 /**
- * Fornece conexões com MongoDB e Redis para toda a aplicação.
- * Marcado como @Global para que os providers não precisem ser reimportados em cada módulo.
- * As conexões reais serão configuradas na Fase 2 (infra) e Fase 3 (esqueleto).
+ * Hub de infraestrutura da aplicação (global).
+ * Centraliza ConfigModule, conexão MongoDB (Mongoose), logger (pino) e o
+ * provider Redis (ioredis). Marcado como @Global para que os módulos de
+ * domínio injetem essas dependências sem reimportar.
  */
 @Global()
 @Module({
-  providers: [],
-  exports: [],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [envConfig],
+      validate: validateEnv,
+    }),
+    LoggerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        pinoHttp: {
+          level:
+            config.get<string>('nodeEnv') === 'production' ? 'info' : 'debug',
+          autoLogging: true,
+        },
+      }),
+    }),
+    MongooseModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        uri: config.get<string>('mongoUri'),
+      }),
+    }),
+  ],
+  providers: [RedisProvider],
+  exports: [RedisProvider, MongooseModule],
 })
 export class SharedModule {}
