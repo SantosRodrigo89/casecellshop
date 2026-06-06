@@ -27,6 +27,7 @@ describe('ProductsService', () => {
     find: jest.fn(),
     findById: jest.fn(),
     findOneAndUpdate: jest.fn(),
+    updateOne: jest.fn(),
     sort: jest.fn(),
     exec: jest.fn(),
   };
@@ -125,6 +126,30 @@ describe('ProductsService', () => {
 
       const result = await service.decrementStock(fakeId, 100);
       expect(result).toBeNull();
+    });
+  });
+
+  // ─── incrementStock() ─────────────────────────────────────────────────────
+
+  describe('incrementStock()', () => {
+    const fakeId = '6650a1b2c3d4e5f6a7b8c9d0';
+
+    it('should skip the query for an invalid ObjectId', async () => {
+      await service.incrementStock('not-an-objectid', 5);
+      expect(mockProductModel.updateOne).not.toHaveBeenCalled();
+    });
+
+    it('should call updateOne with $inc to restore stock', async () => {
+      mockProductModel.updateOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
+      });
+
+      await service.incrementStock(fakeId, 3);
+
+      expect(mockProductModel.updateOne).toHaveBeenCalledWith(
+        { _id: fakeId },
+        { $inc: { stock: 3 } },
+      );
     });
   });
 });

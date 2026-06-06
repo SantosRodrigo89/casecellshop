@@ -37,4 +37,15 @@ export class ProductsService {
       )
       .exec();
   }
+
+  /**
+   * Atomically increments stock by `quantity`.
+   * Used for stock compensation when ERP processing fails after stock was reserved.
+   */
+  async incrementStock(id: string, quantity: number): Promise<void> {
+    if (!isValidObjectId(id)) return;
+    await this.productModel
+      .updateOne({ _id: id }, { $inc: { stock: quantity } })
+      .exec();
+  }
 }

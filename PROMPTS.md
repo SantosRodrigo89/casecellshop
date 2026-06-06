@@ -187,3 +187,42 @@ Este arquivo registra os prompts relevantes utilizados durante o desenvolvimento
 - `npm test`: 29/29 verdes (2 novos testes adicionados)
 - `tsc --noEmit`: limpo
 - `nest build`: limpo
+
+---
+
+## Fase 7b — ERP Resilience + Order Status + E2E
+
+**Prompt:** Implement Phase 7b: full ERP simulation, order status lifecycle (PENDING → PROCESSING → COMPLETED | FAILED), atomic stock compensation on ERP failure, and the 6 mandatory business-scenario E2E tests. No frontend, no Redis locks, no Kafka, no MongoDB transactions, no CQRS.
+
+**Resultado:**
+- `erp/fake-erp.service.ts` — `FakeErpService` completo: `ConfigService` injection, latência artificial via `setTimeout`, timeout via corrida entre dois timers, modos `never`/`always`/`rate`. Método `processOrder` assíncrono; sem dependências externas.
+- `products/products.service.ts` — `incrementStock(id, quantity)` adicionado: `updateOne({ _id }, { $inc: { stock: quantity } })` — usado para compensação de estoque.
+- `orders/orders.service.ts` — `create()` reescrito com fluxo de 8 passos:
+  1. Valida produto (404).
+  2. Pre-check de idempotência (`findOne({ idempotencyKey })`) → retorna pedido existente sem tocar estoque.
+  3. Reserva atômica de estoque (409 se insuficiente).
+  4. Cria pedido como `PENDING`; em E11000: restaura estoque via `incrementStock` e retorna o pedido vencedor.
+  5. Transição para `PROCESSING`.
+  6. Chama `FakeErpService.processOrder()`.
+  7. Sucesso → `COMPLETED`.
+  8. Falha → `FAILED` + `incrementStock` (compensação de estoque). Retorna pedido FAILED (HTTP 201).
+- `orders/orders.module.ts` — importa `ErpModule`.
+- `orders/orders.controller.ts` — Swagger atualizado: `@ApiOperation` com fluxo step-by-step, `@ApiCreatedResponse` cobre COMPLETED e FAILED, descrição do status lifecycle em `GET /api/orders/:id`.
+- `products/products.service.spec.ts` — 2 novos testes para `incrementStock`.
+- `orders/orders.service.spec.ts` — reescrito: `mockErpService` adicionado, `mockOrderModel.updateOne` adicionado; novos testes: fluxo completo COMPLETED, pré-check de idempotência, falha ERP + compensação, E11000 com compensação de estoque, erro não-E11000.
+- `test/orders.e2e-spec.ts` — criado: 6 cenários de negócio (Supertest, MongoDB real `casecellshop-e2e`, stub ERP mutável via `overrideProvider`, fresh product + cleanup por teste).
+- `test/jest-e2e.json` — `"forceExit": true` adicionado.
+
+**Decisões:**
+- Retorno HTTP 201 para pedido FAILED: o pedido existe no banco; o cliente recebe o ID e o motivo da falha; não é necessário endpoint adicional.
+- Pre-check de idempotência antes de decrementar estoque: evita duplo decremento em retries normais; índice único + E11000 cobre a race condition residual.
+- Compensação via `incrementStock` (sem transação): trade-off documentado — sem replica set no Docker Compose, compensação best-effort é aceitável para o escopo do desafio.
+- `FakeErpService` usa `overrideProvider` em todos os testes: zero `Math.random()`, zero fake timers, zero flakiness.
+- E2E usa banco dedicado `casecellshop-e2e` + `dropDatabase()` no beforeAll/afterAll: isolamento sem depender de `mongodb-memory-server`.
+
+**Validação:**
+- `npm run lint`: 0 erros, 0 warnings
+- `npm test`: 33/33 verdes (4 novos testes de unit adicionados)
+- `npm run test:e2e`: 7/7 verdes (6 cenários + health smoke)
+- `tsc --noEmit`: limpo
+- `nest build`: limpo

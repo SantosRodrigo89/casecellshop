@@ -89,19 +89,42 @@ findOneAndUpdate(
 
 If the operation returns `null` (stock is less than the requested quantity), the endpoint responds with **HTTP 409 Conflict** and no order is created.
 
+### Order lifecycle
+
+`PENDING → PROCESSING → COMPLETED | FAILED`
+
+`POST /api/orders` always returns HTTP **201** with the final order. Check the `status` field:
+
+| `status` | Meaning |
+|---|---|
+| `COMPLETED` | ERP accepted the order; stock is decremented. |
+| `FAILED` | ERP failed; stock was atomically restored (compensation). `failureReason` field explains why. |
+
 ### Idempotency
 
-`POST /api/orders` requires an `Idempotency-Key` header (any unique string; UUID recommended):
+`POST /api/orders` requires an `Idempotency-Key` header (UUID recommended):
 
 ```
 Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000
 ```
 
 - Missing header → **HTTP 400 Bad Request**.
-- First request with a given key → order is created and returned (201).
-- Subsequent requests with the same key → existing order is returned (201), no duplicate created.
+- First request → order created and processed (201 COMPLETED or 201 FAILED).
+- Repeat with same key → existing order returned immediately, stock not touched.
 
-Deduplication relies on the MongoDB unique index on `orders.idempotencyKey`. A concurrent insert with the same key raises `E11000`; the service catches it and returns the existing order. No Redis lock is needed.
+Deduplication uses a pre-check (`findOne`) + MongoDB unique index on `idempotencyKey`. Concurrent inserts with the same key trigger `E11000`; the service restores the stock it decremented and returns the winning order.
+
+### ERP simulation
+
+The ERP is simulated via `FakeErpService`, controlled entirely by env vars:
+
+| Variable | Values | Effect |
+|---|---|---|
+| `ERP_FAILURE_MODE` | `never` / `always` / `rate` | Controls failure probability |
+| `ERP_LATENCY_MS` | integer ms | Artificial latency per call |
+| `ERP_TIMEOUT_MS` | integer ms | Timeout threshold; if latency ≥ timeout the call times out |
+
+In E2E tests the service is replaced via `overrideProvider()` — zero flakiness, no real timers.
 
 ### Exemplo de healthcheck
 
@@ -133,15 +156,16 @@ Deduplication relies on the MongoDB unique index on `orders.idempotencyKey`. A c
 
 ## Tests
 
-- Unit tests: `npm test` — 29 tests, 4 suites (health, products, seed, orders)
-- E2E (requires `docker compose up`): `npm run test:e2e`
+- Unit tests: `npm test` — 33 tests, 4 suites (health, products, seed, orders)
+- E2E (requires `docker compose up`): `npm run test:e2e` — 7 tests, 2 suites
 
-Key unit test highlights after Phase 7:
-- `create() > should atomically decrement stock and return a PENDING order`
-- `create() > should throw ConflictException when stock is insufficient`
-- `create() - overselling prevention > should allow exactly 5 of 10 concurrent requests when stock=5`
-- `create() > should return the existing order when Idempotency-Key is duplicated (E11000)`
-- `create() > should re-throw non-E11000 errors from orderModel.create`
+Key E2E scenarios (all passing):
+1. Successful purchase → 201 COMPLETED, stock decremented
+2. Invalid quantity → 400
+3. Product not found → 404
+4. Insufficient stock → 409
+5. Duplicate `Idempotency-Key` → same order returned, no duplicate
+6. ERP failure → 201 FAILED, stock fully restored
 
 ## Arquitetura e decisões
 
