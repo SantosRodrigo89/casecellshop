@@ -19,6 +19,7 @@ import {
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderResponseDto } from './dto/order-response.dto';
+import { ErrorResponseDto } from '../common/dto/error-response.dto';
 
 @ApiTags('orders')
 @Controller('orders')
@@ -30,17 +31,24 @@ export class OrdersController {
   @ApiOperation({
     summary: 'Create order',
     description:
-      'Creates a new order after validating the product and quantity. Returns the order with PENDING status.',
+      'Validates the product (404 if not found), atomically reserves stock via a single ' +
+      'findOneAndUpdate operation (409 if quantity exceeds available stock), then persists ' +
+      'the order. Returns the created order with PENDING status.',
   })
   @ApiCreatedResponse({
     type: OrderResponseDto,
     description: 'Order created successfully.',
   })
   @ApiBadRequestResponse({
+    type: ErrorResponseDto,
     description: 'Invalid request body — productId or quantity is incorrect.',
   })
-  @ApiNotFoundResponse({ description: 'Product not found.' })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    description: 'Product not found.',
+  })
   @ApiConflictResponse({
+    type: ErrorResponseDto,
     description:
       'Insufficient stock — the requested quantity exceeds available stock.',
   })
@@ -55,7 +63,10 @@ export class OrdersController {
       'Returns the order and its current status: PENDING | PROCESSING | COMPLETED | FAILED.',
   })
   @ApiOkResponse({ type: OrderResponseDto, description: 'Order found.' })
-  @ApiNotFoundResponse({ description: 'Order not found.' })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    description: 'Order not found.',
+  })
   findOne(@Param('id') id: string) {
     return this.ordersService.findOne(id);
   }

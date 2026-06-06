@@ -113,6 +113,7 @@ describe('ProductsService', () => {
       expect(mockProductModel.findOneAndUpdate).toHaveBeenCalledWith(
         { _id: fakeId, stock: { $gte: 3 } },
         { $inc: { stock: -3 } },
+        { new: false },
       );
       expect(result).toEqual(productWithStock);
     });

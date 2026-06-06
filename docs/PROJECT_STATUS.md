@@ -206,6 +206,15 @@
 - Idempotency (`Idempotency-Key` header and duplicate order detection).
 - ERP integration (`FakeErpService` and failure compensation).
 
+**Post-review improvements (same phase):**
+- `common/dto/error-response.dto.ts` created — documents the `HttpExceptionFilter` envelope `{ statusCode, message, path, timestamp }`.
+- All error responses on `POST /api/orders` and `GET /api/orders/:id` now expose `type: ErrorResponseDto` in Swagger (400, 404, 409 body schemas visible in the UI).
+- `@ApiOperation.description` on `POST /api/orders` updated to mention the atomic stock reservation and the 409 condition.
+- `findOneAndUpdate` options made explicit: `{ new: false }` documents that the pre-update document is intentionally returned.
+- Exception message strings now asserted in tests (not just exception class).
+- Concurrency test description corrected to "sequential exhaustion simulation" — it tests deterministic event-loop interleaving, not true DB-level race conditions.
+- `OrderResponseDto.createdAt` / `updatedAt` now have `description` fields.
+
 **Status:** ✅ Complete. 0 lint errors, 0 lint warnings, 27/27 tests pass, `tsc` clean.
 
 **Dependencies:** Phase 5 complete.

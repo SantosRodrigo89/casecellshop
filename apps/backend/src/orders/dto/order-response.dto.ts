@@ -45,9 +45,15 @@ export class OrderResponseDto {
   })
   failureReason?: string;
 
-  @ApiProperty({ example: '2026-06-06T12:00:00.000Z' })
+  @ApiProperty({
+    example: '2026-06-06T12:00:00.000Z',
+    description: 'ISO-8601 timestamp of order creation',
+  })
   createdAt: Date;
 
-  @ApiProperty({ example: '2026-06-06T12:00:00.000Z' })
+  @ApiProperty({
+    example: '2026-06-06T12:00:00.000Z',
+    description: 'ISO-8601 timestamp of last status update',
+  })
   updatedAt: Date;
 }

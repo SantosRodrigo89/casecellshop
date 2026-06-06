@@ -141,7 +141,9 @@ describe('OrdersService', () => {
 
       await expect(
         service.create({ productId: VALID_PRODUCT_ID, quantity: 1 }),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(
+        new NotFoundException(`Product not found: ${VALID_PRODUCT_ID}`),
+      );
 
       expect(mockProductsService.decrementStock).not.toHaveBeenCalled();
       expect(mockOrderModel.create).not.toHaveBeenCalled();
@@ -153,7 +155,11 @@ describe('OrdersService', () => {
 
       await expect(
         service.create({ productId: VALID_PRODUCT_ID, quantity: 999 }),
-      ).rejects.toThrow(ConflictException);
+      ).rejects.toThrow(
+        new ConflictException(
+          `Insufficient stock for product: ${VALID_PRODUCT_ID}`,
+        ),
+      );
 
       expect(mockOrderModel.create).not.toHaveBeenCalled();
     });
@@ -162,7 +168,7 @@ describe('OrdersService', () => {
   // ─── create() - concurrency simulation ───────────────────────────────────
 
   describe('create() - overselling prevention', () => {
-    it('should allow exactly 5 of 10 concurrent requests when stock=5', async () => {
+    it('should allow exactly 5 of 10 interleaved requests when stock=5 (sequential exhaustion simulation)', async () => {
       const dto: CreateOrderDto = { productId: VALID_PRODUCT_ID, quantity: 1 };
       let stockRemaining = 5;
 
@@ -224,13 +230,13 @@ describe('OrdersService', () => {
       });
 
       await expect(service.findOne(VALID_PRODUCT_ID)).rejects.toThrow(
-        NotFoundException,
+        new NotFoundException(`Order not found: ${VALID_PRODUCT_ID}`),
       );
     });
 
     it('should throw NotFoundException for an invalid ObjectId', async () => {
       await expect(service.findOne('invalid-id')).rejects.toThrow(
-        NotFoundException,
+        new NotFoundException('Order not found: invalid-id'),
       );
       expect(mockOrderModel.findById).not.toHaveBeenCalled();
     });

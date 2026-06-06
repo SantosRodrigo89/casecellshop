@@ -33,6 +33,7 @@ export class ProductsService {
       .findOneAndUpdate(
         { _id: id, stock: { $gte: quantity } },
         { $inc: { stock: -quantity } },
+        { new: false }, // return the pre-update document (price is unchanged by $inc)
       )
       .exec();
   }
