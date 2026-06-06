@@ -442,3 +442,24 @@ The evaluator will test the three hardest scenarios: out-of-stock (409), duplica
 5. Phase 11 (production Docker) — final packaging.
 6. Phase 10 (Redis cache, bonus) — only if time allows.
 7. Phase 12 (documentation) — finalise README and ADRs last.
+
+---
+
+## Current Progress
+
+**Last Completed Phase:** Phase 5 — Orders Core
+
+**Next Phase:** Phase 6 — Atomic Stock Control
+
+**Phase Objective:** Prevent overselling using atomic MongoDB operations.
+
+**Expected Deliverables:**
+- Stock validation before order creation
+- Atomic stock decrement via `findOneAndUpdate` with `$gte` condition
+- Insufficient stock handling (HTTP 409)
+- Concurrency tests for simultaneous purchase attempts
+
+**Do Not Start:**
+- Idempotency (`Idempotency-Key` header and duplicate order detection)
+- ERP integration (`FakeErpService` implementation and failure compensation)
+- Frontend (Phase 8 and 9)
