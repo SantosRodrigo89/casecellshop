@@ -72,6 +72,21 @@ export default function ProductCard({ product }: Props) {
         boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
       }}
     >
+      {product.imageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={product.imageUrl}
+          alt={product.name}
+          style={{
+            width: '100%',
+            height: '180px',
+            objectFit: 'cover',
+            borderRadius: '6px',
+            backgroundColor: '#f3f4f6',
+          }}
+        />
+      )}
+
       <div>
         <h2 style={{ fontSize: '1.125rem', fontWeight: 600, margin: '0 0 4px 0', color: '#111827' }}>
           {product.name}
