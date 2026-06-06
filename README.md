@@ -73,10 +73,10 @@ npm run dev:frontend    # http://localhost:3000
 | `GET` | `/api/health` | Health check: MongoDB + Redis via `@nestjs/terminus` |
 | `GET` | `/api/docs` | Swagger UI — interactive API documentation |
 | `GET` | `/api/products` | Product catalogue, sorted by name |
-| `POST` | `/api/orders` | Create order — validates product, atomically decrements stock (409 if insufficient), returns `PENDING` order |
+| `POST` | `/api/orders` | Create order — requires `Idempotency-Key` header; validates product, atomically decrements stock (409 if insufficient), deduplicates retries, returns `PENDING` order |
 | `GET` | `/api/orders/:id` | Get order by ID |
 
-### Stock control (Phase 6)
+### Stock control
 
 `POST /api/orders` uses a single atomic MongoDB operation to prevent overselling:
 
@@ -88,6 +88,20 @@ findOneAndUpdate(
 ```
 
 If the operation returns `null` (stock is less than the requested quantity), the endpoint responds with **HTTP 409 Conflict** and no order is created.
+
+### Idempotency
+
+`POST /api/orders` requires an `Idempotency-Key` header (any unique string; UUID recommended):
+
+```
+Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000
+```
+
+- Missing header → **HTTP 400 Bad Request**.
+- First request with a given key → order is created and returned (201).
+- Subsequent requests with the same key → existing order is returned (201), no duplicate created.
+
+Deduplication relies on the MongoDB unique index on `orders.idempotencyKey`. A concurrent insert with the same key raises `E11000`; the service catches it and returns the existing order. No Redis lock is needed.
 
 ### Exemplo de healthcheck
 
@@ -119,13 +133,15 @@ If the operation returns `null` (stock is less than the requested quantity), the
 
 ## Tests
 
-- Unit tests: `npm test` — 27 tests, 4 suites (health, products, seed, orders)
+- Unit tests: `npm test` — 29 tests, 4 suites (health, products, seed, orders)
 - E2E (requires `docker compose up`): `npm run test:e2e`
 
-Key unit test highlights after Phase 6:
+Key unit test highlights after Phase 7:
 - `create() > should atomically decrement stock and return a PENDING order`
 - `create() > should throw ConflictException when stock is insufficient`
 - `create() - overselling prevention > should allow exactly 5 of 10 concurrent requests when stock=5`
+- `create() > should return the existing order when Idempotency-Key is duplicated (E11000)`
+- `create() > should re-throw non-E11000 errors from orderModel.create`
 
 ## Arquitetura e decisões
 

@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Model } from 'mongoose';
-import { randomUUID } from 'crypto';
 import { Order, OrderDocument, OrderStatus } from './schemas/order.schema';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { ProductsService } from '../products/products.service';
@@ -17,7 +16,10 @@ export class OrdersService {
     private readonly productsService: ProductsService,
   ) {}
 
-  async create(dto: CreateOrderDto): Promise<OrderDocument> {
+  async create(
+    dto: CreateOrderDto,
+    idempotencyKey: string,
+  ): Promise<OrderDocument> {
     const product = await this.productsService.findById(dto.productId);
     if (!product) {
       throw new NotFoundException(`Product not found: ${dto.productId}`);
@@ -36,14 +38,25 @@ export class OrdersService {
     const unitPrice = product.price;
     const total = parseFloat((unitPrice * dto.quantity).toFixed(2));
 
-    return this.orderModel.create({
-      productId: product._id,
-      quantity: dto.quantity,
-      unitPrice,
-      total,
-      status: OrderStatus.PENDING,
-      idempotencyKey: randomUUID(),
-    });
+    try {
+      return await this.orderModel.create({
+        productId: product._id,
+        quantity: dto.quantity,
+        unitPrice,
+        total,
+        status: OrderStatus.PENDING,
+        idempotencyKey,
+      });
+    } catch (error) {
+      // Duplicate idempotencyKey: return the existing order instead of creating a new one.
+      if ((error as { code?: number }).code === 11000) {
+        const existing = await this.orderModel
+          .findOne({ idempotencyKey })
+          .exec();
+        if (existing) return existing;
+      }
+      throw error;
+    }
   }
 
   async findOne(id: string): Promise<OrderDocument> {

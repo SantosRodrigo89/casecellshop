@@ -23,6 +23,7 @@ describe('OrdersService', () => {
   const mockOrderModel = {
     create: jest.fn(),
     findById: jest.fn(),
+    findOne: jest.fn(),
   };
 
   const mockProductsService = {
@@ -99,6 +100,7 @@ describe('OrdersService', () => {
   describe('create()', () => {
     it('should atomically decrement stock and return a PENDING order with the correct total', async () => {
       const dto: CreateOrderDto = { productId: VALID_PRODUCT_ID, quantity: 2 };
+      const idempotencyKey = 'test-idempotency-key-uuid';
       const expectedTotal = parseFloat(
         (mockProduct.price * dto.quantity).toFixed(2),
       );
@@ -112,10 +114,10 @@ describe('OrdersService', () => {
         unitPrice: mockProduct.price,
         total: expectedTotal,
         status: OrderStatus.PENDING,
-        idempotencyKey: 'some-uuid',
+        idempotencyKey,
       });
 
-      const result = await service.create(dto);
+      const result = await service.create(dto, idempotencyKey);
 
       expect(mockProductsService.findById).toHaveBeenCalledWith(
         VALID_PRODUCT_ID,
@@ -130,6 +132,7 @@ describe('OrdersService', () => {
           unitPrice: mockProduct.price,
           total: expectedTotal,
           status: OrderStatus.PENDING,
+          idempotencyKey,
         }),
       );
       expect(result.status).toBe(OrderStatus.PENDING);
@@ -140,7 +143,7 @@ describe('OrdersService', () => {
       mockProductsService.findById.mockResolvedValue(null);
 
       await expect(
-        service.create({ productId: VALID_PRODUCT_ID, quantity: 1 }),
+        service.create({ productId: VALID_PRODUCT_ID, quantity: 1 }, 'any-key'),
       ).rejects.toThrow(
         new NotFoundException(`Product not found: ${VALID_PRODUCT_ID}`),
       );
@@ -154,7 +157,10 @@ describe('OrdersService', () => {
       mockProductsService.decrementStock.mockResolvedValue(null);
 
       await expect(
-        service.create({ productId: VALID_PRODUCT_ID, quantity: 999 }),
+        service.create(
+          { productId: VALID_PRODUCT_ID, quantity: 999 },
+          'any-key',
+        ),
       ).rejects.toThrow(
         new ConflictException(
           `Insufficient stock for product: ${VALID_PRODUCT_ID}`,
@@ -162,6 +168,50 @@ describe('OrdersService', () => {
       );
 
       expect(mockOrderModel.create).not.toHaveBeenCalled();
+    });
+
+    it('should return the existing order when Idempotency-Key is duplicated (E11000)', async () => {
+      const dto: CreateOrderDto = { productId: VALID_PRODUCT_ID, quantity: 1 };
+      const idempotencyKey = 'duplicate-key-uuid';
+      const existingOrder = {
+        id: 'existing-order-id',
+        productId: VALID_PRODUCT_ID,
+        quantity: 1,
+        unitPrice: mockProduct.price,
+        total: mockProduct.price,
+        status: OrderStatus.PENDING,
+        idempotencyKey,
+      };
+
+      mockProductsService.findById.mockResolvedValue(mockProduct);
+      mockProductsService.decrementStock.mockResolvedValue(mockProduct);
+
+      const duplicateKeyError = Object.assign(
+        new Error('E11000 duplicate key error'),
+        { code: 11000 },
+      );
+      mockOrderModel.create.mockRejectedValue(duplicateKeyError);
+      mockOrderModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(existingOrder),
+      });
+
+      const result = await service.create(dto, idempotencyKey);
+
+      expect(result).toEqual(existingOrder);
+      expect(mockOrderModel.findOne).toHaveBeenCalledWith({ idempotencyKey });
+    });
+
+    it('should re-throw non-E11000 errors from orderModel.create', async () => {
+      const dto: CreateOrderDto = { productId: VALID_PRODUCT_ID, quantity: 1 };
+      const unexpectedError = new Error('Unexpected database error');
+
+      mockProductsService.findById.mockResolvedValue(mockProduct);
+      mockProductsService.decrementStock.mockResolvedValue(mockProduct);
+      mockOrderModel.create.mockRejectedValue(unexpectedError);
+
+      await expect(service.create(dto, 'any-key')).rejects.toThrow(
+        unexpectedError,
+      );
     });
   });
 
@@ -197,7 +247,7 @@ describe('OrdersService', () => {
       );
 
       const results = await Promise.allSettled(
-        Array.from({ length: 10 }, () => service.create(dto)),
+        Array.from({ length: 10 }, (_, i) => service.create(dto, `key-${i}`)),
       );
 
       const succeeded = results.filter((r) => r.status === 'fulfilled');

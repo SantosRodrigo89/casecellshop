@@ -163,3 +163,27 @@ Este arquivo registra os prompts relevantes utilizados durante o desenvolvimento
 - `npm run lint`: 0 erros, 0 warnings
 - `npm test`: 27/27 verdes (5 novos testes adicionados)
 - `tsc --noEmit`: limpo
+
+---
+
+## Fase 7 — Idempotency
+
+**Prompt:** Implement Phase 7 — Idempotency only. Enforce the `Idempotency-Key` header on `POST /api/orders` (400 if missing), replace the `randomUUID()` placeholder with the actual header value, catch `E11000` (MongoDB duplicate key, code 11000) on `orderModel.create` and return the existing order. Add `@ApiHeader` to Swagger. Add unit tests for the E11000 deduplication and non-E11000 error propagation scenarios.
+
+**Resultado:**
+- `orders/orders.controller.ts` — `@ApiHeader` adicionado; `@IdempotencyKey()` wired como parâmetro de `create()`; `BadRequestException` lançada se header ausente; key passada para o service.
+- `orders/orders.service.ts` — `randomUUID()` e import `crypto` removidos; assinatura de `create()` atualizada para `(dto, idempotencyKey: string)`; `orderModel.create()` envolto em try/catch: `code === 11000` → `findOne({ idempotencyKey })` → retorna pedido existente; erros não-E11000 re-lançados.
+- `orders/orders.service.spec.ts` — `findOne` adicionado ao `mockOrderModel`; todos os `service.create(dto)` atualizados para `service.create(dto, key)`; 2 novos testes: E11000 deduplication e non-E11000 propagation; teste de concorrência atualizado com chaves únicas por request.
+- Swagger: descrições de `@ApiOperation`, `@ApiCreatedResponse` e `@ApiBadRequestResponse` atualizadas para documentar o comportamento do header e da deduplicação.
+
+**Decisões:**
+- Header validado no controller (concern HTTP), não no service (concern de negócio).
+- `(error as { code?: number }).code === 11000` em vez de importar `MongoServerError` de `mongodb` (dependência transitiva do mongoose): evita acoplamento com a versão interna do driver.
+- Stock já decrementado antes do `create()`: em caso de E11000, o pedido existente já tem o estoque reservado; não há necessidade de compensação.
+- `findOne({ idempotencyKey })` em vez de `findById`: o erro E11000 ocorre antes do Mongoose retornar o `_id`; buscar pela key é a única opção confiável.
+
+**Validação:**
+- `npm run lint`: 0 erros, 0 warnings
+- `npm test`: 29/29 verdes (2 novos testes adicionados)
+- `tsc --noEmit`: limpo
+- `nest build`: limpo
