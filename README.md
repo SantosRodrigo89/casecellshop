@@ -10,7 +10,7 @@ resilience using NestJS, Next.js, MongoDB, and Redis.
 
 ## Challenge context
 
-The challenge is a Senior Fullstack Engineer technical assessment. The required stack is
+The challenge is a Fullstack Engineer technical assessment. The stack is
 **NestJS, Next.js, MongoDB, Redis, Docker, and TypeScript**, and the deliverable is a
 functional checkout flow for a store that sells phone cases.
 
