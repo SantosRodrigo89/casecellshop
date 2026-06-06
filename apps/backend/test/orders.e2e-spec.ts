@@ -59,7 +59,19 @@ describe('Orders (e2e)', () => {
   /** Mutable ERP stub — tests configure it via mockResolvedValue / mockRejectedValue. */
   const erpStub = { processOrder: jest.fn() };
 
+  // Saved so they can be restored after the suite, preventing cross-suite env pollution
+  // when Jest runs test files in the same process (e.g. --runInBand).
+  let originalMongoUri: string | undefined;
+  let originalNodeEnv: string | undefined;
+  let originalErpFailureMode: string | undefined;
+  let originalErpLatencyMs: string | undefined;
+
   beforeAll(async () => {
+    originalMongoUri = process.env.MONGO_URI;
+    originalNodeEnv = process.env.NODE_ENV;
+    originalErpFailureMode = process.env.ERP_FAILURE_MODE;
+    originalErpLatencyMs = process.env.ERP_LATENCY_MS;
+
     // Point to a dedicated test database to avoid polluting the dev database.
     process.env.MONGO_URI = 'mongodb://localhost:27017/casecellshop-e2e';
     process.env.REDIS_HOST = process.env.REDIS_HOST ?? 'localhost';
@@ -99,6 +111,12 @@ describe('Orders (e2e)', () => {
   afterAll(async () => {
     await connection.dropDatabase();
     await app.close();
+
+    // Restore env vars so subsequent suites in the same process see a clean state.
+    process.env.MONGO_URI = originalMongoUri;
+    process.env.NODE_ENV = originalNodeEnv;
+    process.env.ERP_FAILURE_MODE = originalErpFailureMode;
+    process.env.ERP_LATENCY_MS = originalErpLatencyMs;
   });
 
   beforeEach(async () => {

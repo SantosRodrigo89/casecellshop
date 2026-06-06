@@ -23,7 +23,8 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('CaseCellShop API')
     .setDescription(
-      'API de checkout: vitrine de produtos, pedidos e healthcheck.',
+      'Checkout mini-flow: product catalogue, order creation with atomic stock control, ' +
+        'idempotency, ERP simulation, and health check.',
     )
     .setVersion('1.0')
     .build();

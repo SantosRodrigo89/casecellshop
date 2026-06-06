@@ -1,6 +1,8 @@
 import {
   ConflictException,
   Injectable,
+  InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -12,6 +14,8 @@ import { FakeErpService } from '../erp/fake-erp.service';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     @InjectModel(Order.name) private readonly orderModel: Model<OrderDocument>,
     private readonly productsService: ProductsService,
@@ -108,10 +112,27 @@ export class OrdersService {
         )
         .exec();
       // Compensate: restore stock so it can be purchased again.
-      await this.productsService.incrementStock(dto.productId, dto.quantity);
+      try {
+        await this.productsService.incrementStock(dto.productId, dto.quantity);
+      } catch (compensationError) {
+        this.logger.error(
+          `Stock compensation failed for order ${String(order._id)} ` +
+            `(product ${dto.productId}, qty ${dto.quantity}): ` +
+            `${(compensationError as Error).message}`,
+        );
+        throw new InternalServerErrorException(
+          'ERP processing failed and stock compensation could not be completed.',
+        );
+      }
     }
 
-    return this.orderModel.findById(order._id).exec() as Promise<OrderDocument>;
+    const final = await this.orderModel.findById(order._id).exec();
+    if (!final) {
+      throw new NotFoundException(
+        `Order not found after creation: ${String(order._id)}`,
+      );
+    }
+    return final;
   }
 
   async findOne(id: string): Promise<OrderDocument> {
