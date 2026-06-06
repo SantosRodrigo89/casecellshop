@@ -1,0 +1,15 @@
+{
+  "name": "casecellshop",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:backend": "npm run start:dev --prefix apps/backend",
+    "dev:frontend": "npm run dev --prefix apps/frontend",
+    "test": "npm run test --prefix apps/backend",
+    "test:cov": "npm run test:cov --prefix apps/backend",
+    "test:e2e": "npm run test:e2e --prefix apps/backend",
+    "lint": "npm run lint --prefix apps/backend && npm run lint --prefix apps/frontend",
+    "build": "npm run build --prefix apps/backend && npm run build --prefix apps/frontend",
+    "format": "npm run format --prefix apps/backend"
+  }
+}
