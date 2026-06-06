@@ -226,3 +226,33 @@ Este arquivo registra os prompts relevantes utilizados durante o desenvolvimento
 - `npm run test:e2e`: 7/7 verdes (6 cenários + health smoke)
 - `tsc --noEmit`: limpo
 - `nest build`: limpo
+
+---
+
+## Fase 8 — Frontend MVP
+
+**Prompt:** Implement Phase 8 — Frontend MVP. Display products from GET /api/products, allow quantity selection, create orders via POST /api/orders with crypto.randomUUID() Idempotency-Key, show loading state, prevent multiple clicks during processing, display success/error messages with order status and order ID. Use Next.js App Router, TypeScript, no state management libraries. Error handling: 400 / 404 / 409 / 500.
+
+**Resultado:**
+- `src/types/index.ts` — `Product`, `Order`, `OrderStatus`, `ApiError` interfaces.
+- `src/lib/api/index.ts` — updated with proper types: `api.products.list()` → `Product[]`, `api.orders.create()` → `Order`, `api.orders.findOne()` → `Order`.
+- `src/components/ProductCard.tsx` (Client Component):
+  - Quantity input (min 1, max = stock) disabled during loading or when out of stock.
+  - Buy Now button: disabled + "Processing…" text while loading; prevents multiple submissions.
+  - `crypto.randomUUID()` called inside `handleBuy()` — fresh key per attempt.
+  - Success state: shows order ID, status, total, failureReason (for FAILED orders); "Buy again" resets to idle.
+  - Error mapping: 400 → invalid request, 404 → product not found, 409 → insufficient stock, default → temporary failure.
+- `src/app/page.tsx` (Client Component): `useEffect` fetches product list; renders loading spinner, error banner, or responsive product grid (`auto-fill minmax(280px, 1fr)`).
+- `src/app/layout.tsx` — metadata updated to "CaseCellShop".
+
+**Decisões:**
+- Client Component para a página principal (useEffect + useState): evita complexidade de Server Component vs. Client split para um MVP simples.
+- Inline styles em vez de Tailwind classes: garante correto output do build sem configuração adicional de purge; mais previsível para estilos dinâmicos baseados em estado.
+- `crypto.randomUUID()` nativo (sem dependência extra): disponível em todos os browsers modernos e Node 20.
+- Nenhuma lib de estado (Redux, Zustand, React Query): gerenciamento local com `useState` é suficiente para o escopo.
+- Fase 8 e 9 entregues juntas: checkout e listagem estão na mesma tela; separar em duas fases seria overengineering.
+
+**Validação:**
+- `npm run lint`: 0 erros, 0 warnings
+- `npm run build`: next build limpo (TypeScript limpo, static generation 4/4 páginas)
+- `tsc`: limpo

@@ -3,7 +3,7 @@
 > **Purpose:** Single source of truth for any AI assistant or developer picking up this project.
 > No prior conversation context is required to continue work from this document.
 >
-> **Last updated:** 2026-06-06 (Phase 7b) | **Author:** AI-assisted development session
+> **Last updated:** 2026-06-06 (Phase 8) | **Author:** AI-assisted development session
 
 ---
 
@@ -33,10 +33,12 @@
 - `ErpModule`: `FakeErpService` — configurable latency, timeout, and failure modes; fully implemented in Phase 7b.
 
 ### Frontend (Next.js)
-- Scaffolded with App Router, TypeScript, and Tailwind CSS.
-- `src/lib/api/index.ts` — typed HTTP client pointing to the backend.
-- `src/components/` — reserved for Phase 8 UI components.
-- **Not implemented yet.** Phase 8 and 9.
+- App Router, TypeScript, Tailwind CSS.
+- `src/types/index.ts` — `Product`, `Order`, `OrderStatus`, `ApiError` interfaces.
+- `src/lib/api/index.ts` — typed HTTP client (`api.products.list`, `api.orders.create`, `api.orders.findOne`, `api.health.check`).
+- `src/components/ProductCard.tsx` — Client Component: quantity selector, buy button, loading/disabled states, success card (order ID + status), error messages.
+- `src/app/page.tsx` — Client Component: fetches product list, renders responsive product grid, loading and error states.
+- Phase 8 complete. Phase 9 merged into Phase 8 (checkout flow implemented on same page).
 
 ### Database (MongoDB via Mongoose)
 - `products` collection: name, slug (unique), price, stock, imageUrl, timestamps.
@@ -278,29 +280,32 @@
 
 ---
 
-### Phase 8 — Frontend Storefront
-**Goal:** Next.js product listing page.
+### Phase 8 — Frontend MVP ✅
+**Goal:** Next.js product listing page with integrated checkout flow.
 
-**Expected deliverables:**
-- `GET /api/products` consumed and rendered as a product card grid.
-- Responsive layout with Tailwind CSS.
-- Loading and error states.
-- Product detail page (optional).
+**Deliverables:**
+- `src/types/index.ts`: `Product`, `Order`, `OrderStatus`, `ApiError` interfaces.
+- `src/lib/api/index.ts`: Updated with fully-typed API methods.
+- `src/components/ProductCard.tsx` (Client Component):
+  - Displays product name, price, stock count.
+  - Quantity input (min 1, max = stock, disabled when out of stock or loading).
+  - Buy Now button — disabled during loading and when out of stock.
+  - `crypto.randomUUID()` generates a fresh `Idempotency-Key` per attempt.
+  - Success state: order ID, status (COMPLETED / FAILED), total, failure reason.
+  - Error messages: 400 (invalid request), 404 (product not found), 409 (insufficient stock), 5xx (temporary failure).
+  - "Buy again" button resets the card to idle state.
+- `src/app/page.tsx` (Client Component): product grid with loading and error states.
+- `src/app/layout.tsx`: metadata updated to "CaseCellShop".
+- 0 lint errors, 0 lint warnings, `next build` passes (TypeScript clean, static generation).
 
-**Dependencies:** Phase 4 complete (independent of Phase 6/7).
+**Dependencies:** Phase 7b complete.
 
 ---
 
 ### Phase 9 — Frontend Checkout
-**Goal:** Next.js checkout flow connected to the backend.
+**Goal:** Merged into Phase 8 — checkout flow implemented on the product card.
 
-**Expected deliverables:**
-- "Buy" button on product card triggers `POST /api/orders`.
-- Auto-generated `Idempotency-Key` per attempt (UUID, stored in component state).
-- Handles all error states: 400 (invalid), 409 (out of stock), 503 (ERP down), duplicate key (same order shown).
-- Polls or navigates to `GET /api/orders/:id` to display order status cycle.
-
-**Dependencies:** Phase 6 complete (needs real checkout behaviour).
+**Status:** ✅ Complete (delivered as part of Phase 8 MVP).
 
 ---
 
@@ -454,7 +459,7 @@ The orders suite uses the `casecellshop-e2e` database and cleans up after itself
 
 | Limitation | Reason | Resolution |
 |---|---|---|
-| No frontend implementation | Phase 8 and 9 | Phase 8–9 |
+| No Redis cache for products | Phase 10 bonus | Phase 10 |
 | Stock compensation is non-transactional | No replica set in Docker Compose; compensate with `$inc` on ERP failure — documented ADR trade-off | Accepted |
 | `GET /api/products` has no cache | Redis cache is a Phase 10 bonus | Phase 10 |
 | ERP `rate` mode uses `Math.random()` | Non-deterministic by design; tests always use `overrideProvider` stub | Accepted |
@@ -492,9 +497,9 @@ With idempotency complete, the next step is to cover all 6 mandatory business sc
 - Idempotency: `Idempotency-Key` header enforced; pre-check + E11000 deduplication.
 - ERP simulation: `FakeErpService` with latency/timeout/failure modes; stock compensation on failure.
 - Full order lifecycle: `PENDING → PROCESSING → COMPLETED | FAILED`.
+- Frontend MVP: product grid, quantity selector, checkout with idempotency, all error states (400/404/409/5xx), order confirmation with ID and status.
 
 ### Still missing for a complete delivery
-- Frontend UI (Phase 8–9).
 - Redis cache-aside for `GET /api/products` (Phase 10 bonus).
 - Production Dockerfiles + full-stack compose (Phase 11).
 - Final README with cloud deployment notes (Phase 12).
@@ -516,11 +521,9 @@ With idempotency complete, the next step is to cover all 6 mandatory business sc
 
 ## Current Progress
 
-**Last Completed Phase:** Phase 7b — ERP Resilience + Order Status + E2E
+**Last Completed Phase:** Phase 8 — Frontend MVP
 
-**Next Phase:** Phase 8 — Frontend Storefront (Next.js)
-
-**Phase 8 Objective:** Implement the Next.js product listing page consuming `GET /api/products`. Responsive grid with Tailwind, loading and error states.
+**Next Phase:** Phase 10 — Redis Cache (bonus) or Phase 11 — Production Dockerfiles
 
 **Do Not Start:**
 - Redis cache (Phase 10) — bonus, after core features

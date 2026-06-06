@@ -154,6 +154,18 @@ In E2E tests the service is replaced via `overrideProvider()` — zero flakiness
 | `npm run lint`            | Lint de backend e frontend            |
 | `npm run build`           | Build de produção dos dois apps       |
 
+## Frontend
+
+Open `http://localhost:3000` after running `npm run dev:frontend`.
+
+- Product grid loads from `GET /api/products`.
+- Each card shows name, price, and current stock.
+- Select quantity and click **Buy Now** to place an order.
+- A fresh `Idempotency-Key` (UUID) is generated per purchase attempt.
+- The button is disabled during processing to prevent duplicate clicks.
+- After purchase: order ID, status (`COMPLETED` / `FAILED`), and total are displayed.
+- Error messages: 400 (invalid request), 404 (product not found), 409 (out of stock), 5xx (temporary failure).
+
 ## Tests
 
 - Unit tests: `npm test` — 33 tests, 4 suites (health, products, seed, orders)
