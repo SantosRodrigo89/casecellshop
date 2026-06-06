@@ -76,6 +76,24 @@ npm run dev:frontend    # http://localhost:3000
 | `POST` | `/api/orders` | Create order — requires `Idempotency-Key` header; validates product, atomically decrements stock (409 if insufficient), deduplicates retries, returns `PENDING` order |
 | `GET` | `/api/orders/:id` | Get order by ID |
 
+### Product cache
+
+`GET /api/products` uses a cache-aside strategy backed by Redis:
+
+- **Cache key:** `products:all` — **TTL:** 60 seconds.
+- **Cache miss:** queries MongoDB, stores result in Redis with `SETEX`, returns products.
+- **Cache hit:** returns the cached JSON directly — MongoDB query skipped.
+- **Cache invalidation:** `DEL products:all` is called whenever product stock changes:
+  - `decrementStock()` — called on every successful order creation.
+  - `incrementStock()` — called on stock compensation after an ERP failure.
+
+Structured log events (visible in the JSON logs):
+```
+CACHE_HIT key=products:all
+CACHE_MISS key=products:all
+CACHE_INVALIDATED key=products:all reason=stock_decremented|stock_incremented
+```
+
 ### Stock control
 
 `POST /api/orders` uses a single atomic MongoDB operation to prevent overselling:
@@ -168,7 +186,7 @@ Open `http://localhost:3000` after running `npm run dev:frontend`.
 
 ## Tests
 
-- Unit tests: `npm test` — 33 tests, 4 suites (health, products, seed, orders)
+- Unit tests: `npm test` — 37 tests, 4 suites (health, products, seed, orders)
 - E2E (requires `docker compose up`): `npm run test:e2e` — 7 tests, 2 suites
 
 Key E2E scenarios (all passing):

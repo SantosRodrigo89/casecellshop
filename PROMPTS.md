@@ -256,3 +256,30 @@ Este arquivo registra os prompts relevantes utilizados durante o desenvolvimento
 - `npm run lint`: 0 erros, 0 warnings
 - `npm run build`: next build limpo (TypeScript limpo, static generation 4/4 páginas)
 - `tsc`: limpo
+
+---
+
+## Fase 10 — Redis Cache (Bonus)
+
+**Prompt:** Implement Phase 10 — Redis Cache (Bonus). Cache GET /api/products in Redis (key: products:all, TTL: 60 s, cache-aside). On cache miss: read from MongoDB, store result, return products. On cache hit: return cached products. On stock changes (decrementStock / incrementStock): invalidate cache key. Structured log events: CACHE_HIT, CACHE_MISS, CACHE_INVALIDATED. No CacheInterceptor, no Pub/Sub, no distributed cache, no Redis locks, no new packages. Add unit tests. Update PROJECT_STATUS.md, README.md, PROMPTS.md. Run lint, tests, build.
+
+**Resultado:**
+- `products/products.service.ts` — injeção de `REDIS_CLIENT` (ioredis via token do `SharedModule`) e `Logger` do NestJS.
+- `findAll()` implementa cache-aside: `redis.get('products:all')` → hit retorna JSON parsed; miss consulta MongoDB, chama `redis.setex('products:all', 60, json)` e retorna produtos.
+- `decrementStock()` — chama `redis.del('products:all')` somente quando o documento foi atualizado (resultado não-nulo); loga CACHE_INVALIDATED.
+- `incrementStock()` — chama `redis.del('products:all')` após o `updateOne`; loga CACHE_INVALIDATED.
+- Log events: `CACHE_HIT key=products:all`, `CACHE_MISS key=products:all`, `CACHE_INVALIDATED key=products:all reason=stock_decremented|stock_incremented`.
+- `products/products.service.spec.ts` — adicionado `mockRedisClient` (`get`, `setex`, `del`); 5 novos testes: miss consulta DB e popula cache, hit retorna cache sem consultar DB, decremento bem-sucedido invalida cache, decremento sem estoque NÃO invalida cache, incremento invalida cache.
+- Nenhum pacote novo adicionado.
+
+**Decisões:**
+- Invalidação somente em `decrementStock` com resultado não-nulo: se o estoque é insuficiente, nenhum dado mudou; invalidar seria falso positivo e aumentaria latência desnecessariamente.
+- Retorno do cache como `ProductDocument[]` via cast: o controller serializa para JSON de qualquer forma; sem impacto no contrato da API.
+- Logger padrão do NestJS (`@nestjs/common Logger`): interceptado pelo nestjs-pino, produz JSON estruturado em produção sem dependência adicional.
+- Token `REDIS_CLIENT` do `SharedModule` (@Global): não há necessidade de reimportar o módulo Redis em `ProductsModule`.
+
+**Validação:**
+- `npm run lint`: 0 erros, 0 warnings
+- `npm test`: 37/37 verdes (5 novos testes de cache adicionados)
+- `nest build`: limpo
+- `next build`: limpo

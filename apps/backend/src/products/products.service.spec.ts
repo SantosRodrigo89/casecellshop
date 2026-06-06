@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { ProductsService } from './products.service';
 import { Product } from './schemas/product.schema';
+import { REDIS_CLIENT } from '../shared/redis.constants';
 
 const mockProducts = [
   {
@@ -20,6 +21,8 @@ const mockProducts = [
   },
 ];
 
+const CACHE_KEY = 'products:all';
+
 describe('ProductsService', () => {
   let service: ProductsService;
 
@@ -32,6 +35,12 @@ describe('ProductsService', () => {
     exec: jest.fn(),
   };
 
+  const mockRedisClient = {
+    get: jest.fn(),
+    setex: jest.fn(),
+    del: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -39,10 +48,15 @@ describe('ProductsService', () => {
     mockProductModel.sort.mockReturnValue(mockProductModel);
     mockProductModel.exec.mockResolvedValue(mockProducts);
 
+    mockRedisClient.get.mockResolvedValue(null); // default: cache miss
+    mockRedisClient.setex.mockResolvedValue('OK');
+    mockRedisClient.del.mockResolvedValue(1);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProductsService,
         { provide: getModelToken(Product.name), useValue: mockProductModel },
+        { provide: REDIS_CLIENT, useValue: mockRedisClient },
       ],
     }).compile();
 
@@ -53,19 +67,41 @@ describe('ProductsService', () => {
     expect(service).toBeDefined();
   });
 
+  // ─── findAll() ────────────────────────────────────────────────────────────
+
   describe('findAll()', () => {
-    it('should return products sorted by name', async () => {
+    it('should return products sorted by name on cache miss', async () => {
       const result = await service.findAll();
       expect(result).toEqual(mockProducts);
     });
 
-    it('should call find().sort({ name: 1 }).exec()', async () => {
+    it('should query the DB and populate the cache on cache miss', async () => {
       await service.findAll();
+
+      expect(mockRedisClient.get).toHaveBeenCalledWith(CACHE_KEY);
       expect(mockProductModel.find).toHaveBeenCalledTimes(1);
       expect(mockProductModel.sort).toHaveBeenCalledWith({ name: 1 });
       expect(mockProductModel.exec).toHaveBeenCalledTimes(1);
+      expect(mockRedisClient.setex).toHaveBeenCalledWith(
+        CACHE_KEY,
+        60,
+        JSON.stringify(mockProducts),
+      );
+    });
+
+    it('should return cached products without querying the DB on cache hit', async () => {
+      mockRedisClient.get.mockResolvedValue(JSON.stringify(mockProducts));
+
+      const result = await service.findAll();
+
+      expect(result).toEqual(mockProducts);
+      expect(mockRedisClient.get).toHaveBeenCalledWith(CACHE_KEY);
+      expect(mockProductModel.find).not.toHaveBeenCalled();
+      expect(mockRedisClient.setex).not.toHaveBeenCalled();
     });
   });
+
+  // ─── findById() ───────────────────────────────────────────────────────────
 
   describe('findById()', () => {
     it('should return null for an invalid ObjectId', async () => {
@@ -127,6 +163,26 @@ describe('ProductsService', () => {
       const result = await service.decrementStock(fakeId, 100);
       expect(result).toBeNull();
     });
+
+    it('should invalidate the cache when stock is successfully decremented', async () => {
+      mockProductModel.findOneAndUpdate.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(productWithStock),
+      });
+
+      await service.decrementStock(fakeId, 3);
+
+      expect(mockRedisClient.del).toHaveBeenCalledWith(CACHE_KEY);
+    });
+
+    it('should NOT invalidate the cache when stock decrement fails (null returned)', async () => {
+      mockProductModel.findOneAndUpdate.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
+
+      await service.decrementStock(fakeId, 100);
+
+      expect(mockRedisClient.del).not.toHaveBeenCalled();
+    });
   });
 
   // ─── incrementStock() ─────────────────────────────────────────────────────
@@ -137,6 +193,7 @@ describe('ProductsService', () => {
     it('should skip the query for an invalid ObjectId', async () => {
       await service.incrementStock('not-an-objectid', 5);
       expect(mockProductModel.updateOne).not.toHaveBeenCalled();
+      expect(mockRedisClient.del).not.toHaveBeenCalled();
     });
 
     it('should call updateOne with $inc to restore stock', async () => {
@@ -150,6 +207,16 @@ describe('ProductsService', () => {
         { _id: fakeId },
         { $inc: { stock: 3 } },
       );
+    });
+
+    it('should invalidate the cache after incrementing stock', async () => {
+      mockProductModel.updateOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
+      });
+
+      await service.incrementStock(fakeId, 3);
+
+      expect(mockRedisClient.del).toHaveBeenCalledWith(CACHE_KEY);
     });
   });
 });

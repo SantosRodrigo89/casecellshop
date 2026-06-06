@@ -3,7 +3,7 @@
 > **Purpose:** Single source of truth for any AI assistant or developer picking up this project.
 > No prior conversation context is required to continue work from this document.
 >
-> **Last updated:** 2026-06-06 (Phase 8) | **Author:** AI-assisted development session
+> **Last updated:** 2026-06-06 (Phase 10) | **Author:** AI-assisted development session
 
 ---
 
@@ -46,8 +46,11 @@
 - `toJSON` transform on both schemas: exposes `id` (string) instead of `_id` (ObjectId).
 
 ### Cache / Key-Value (Redis via ioredis)
-- Currently used for: health check ping (`GET /api/health`).
-- Planned (Phase 10 bonus): cache-aside for `GET /api/products` with TTL + invalidation on write.
+- Used for: health check ping (`GET /api/health`) and product-list cache (`GET /api/products`).
+- Cache-aside strategy on `GET /api/products`: key `products:all`, TTL 60 s.
+  - **CACHE_HIT**: returns cached JSON, skips MongoDB query.
+  - **CACHE_MISS**: queries MongoDB, stores result in Redis with `SETEX`, returns products.
+  - **CACHE_INVALIDATED**: `DEL products:all` called in `decrementStock()` (on success) and `incrementStock()`.
 - **No Redis lock for idempotency** — deduplication relies on the MongoDB unique index on `idempotencyKey`.
 
 ### Infrastructure (Docker Compose)
@@ -309,15 +312,25 @@
 
 ---
 
-### Phase 10 — Redis Cache (Bonus)
+### Phase 10 — Redis Cache (Bonus) ✅
 **Goal:** Cache-aside layer for `GET /api/products`.
 
-**Expected deliverables:**
-- Products cached in Redis on first fetch with a short TTL.
-- Cache invalidated when product stock changes.
-- Demonstrable cache HIT vs MISS in logs.
+**Deliverables:**
+- `ProductsService.findAll()` implements cache-aside: checks Redis key `products:all` before querying MongoDB.
+- On cache miss: queries MongoDB, stores result with `SETEX products:all 60 <json>`, returns products.
+- On cache hit: parses and returns cached JSON — MongoDB query skipped entirely.
+- Cache invalidation in `decrementStock()` (only when stock was actually changed, i.e., non-null result) and `incrementStock()`: `DEL products:all`.
+- Structured log events emitted via NestJS `Logger` (consumed by nestjs-pino / structured JSON):
+  - `CACHE_HIT key=products:all`
+  - `CACHE_MISS key=products:all`
+  - `CACHE_INVALIDATED key=products:all reason=stock_decremented|stock_incremented`
+- No new packages introduced; uses existing `REDIS_CLIENT` token from `SharedModule`.
+- No `CacheInterceptor`, no Pub/Sub, no distributed cache, no Redis locks.
+- Unit tests added (5 new): cache miss path, cache hit path (no DB call), cache invalidation on decrement success, no invalidation on decrement failure, cache invalidation on increment.
 
-**Dependencies:** Phase 6 (stock changes must invalidate the cache).
+**Status:** ✅ Complete. 0 lint errors, 0 lint warnings, 37/37 unit tests pass, `tsc` clean, `nest build` clean.
+
+**Dependencies:** Phase 6 complete.
 
 ---
 
@@ -394,7 +407,7 @@ The API is documented from Phase 3. Every new endpoint added its Swagger decorat
 
 ## Existing Tests
 
-### Unit tests (33 passing, 4 suites)
+### Unit tests (37 passing, 4 suites)
 
 **HealthController** (`health.controller.spec.ts`)
 - `should be defined`
@@ -402,13 +415,19 @@ The API is documented from Phase 3. Every new endpoint added its Swagger decorat
 
 **ProductsService** (`products.service.spec.ts`)
 - `should be defined`
-- `findAll() > should return products sorted by name`
-- `findAll() > should call find().sort({ name: 1 }).exec()`
+- `findAll() > should return products sorted by name on cache miss`
+- `findAll() > should query the DB and populate the cache on cache miss`
+- `findAll() > should return cached products without querying the DB on cache hit`
 - `findById() > should return null for an invalid ObjectId`
 - `findById() > should query the model with a valid ObjectId`
 - `decrementStock() > should return null for an invalid ObjectId without querying the model`
 - `decrementStock() > should return the pre-update document when stock is sufficient`
 - `decrementStock() > should return null when stock is insufficient (model returns null)`
+- `decrementStock() > should invalidate the cache when stock is successfully decremented`
+- `decrementStock() > should NOT invalidate the cache when stock decrement fails (null returned)`
+- `incrementStock() > should skip the query for an invalid ObjectId`
+- `incrementStock() > should call updateOne with $inc to restore stock`
+- `incrementStock() > should invalidate the cache after incrementing stock`
 
 **ProductsSeedService** (`products-seed.service.spec.ts`)
 - `should be defined`
@@ -459,13 +478,10 @@ The orders suite uses the `casecellshop-e2e` database and cleans up after itself
 
 | Limitation | Reason | Resolution |
 |---|---|---|
-| No Redis cache for products | Phase 10 bonus | Phase 10 |
 | Stock compensation is non-transactional | No replica set in Docker Compose; compensate with `$inc` on ERP failure — documented ADR trade-off | Accepted |
-| `GET /api/products` has no cache | Redis cache is a Phase 10 bonus | Phase 10 |
 | ERP `rate` mode uses `Math.random()` | Non-deterministic by design; tests always use `overrideProvider` stub | Accepted |
 | No production Dockerfiles | Phase 11 | Phase 11 |
-| Stock compensation is non-transactional | No replica set in Docker Compose; compensate with `$inc` on ERP failure | Known — documented in ADR |
-| `GET /api/products` has no cache | Redis cache is a Phase 10 bonus | Phase 10 |
+| Cache returns plain objects (not Mongoose documents) | JSON round-trip strips Mongoose methods; controller serialises to JSON anyway | Accepted |
 
 ---
 
@@ -493,14 +509,13 @@ With idempotency complete, the next step is to cover all 6 mandatory business sc
 - MongoDB unique indexes defined on `slug` (products) and `idempotencyKey` (orders).
 - Docker Compose with healthchecks and persistent volumes.
 - Swagger with full lifecycle documentation (`@ApiHeader`, step-by-step description, COMPLETED/FAILED examples).
-- Code: English-only, 0 lint errors/warnings, 33/33 unit tests green, 7/7 E2E tests green, `tsc` clean.
+- Code: English-only, 0 lint errors/warnings, 37/37 unit tests green, 7/7 E2E tests green, `tsc` clean.
 - Idempotency: `Idempotency-Key` header enforced; pre-check + E11000 deduplication.
 - ERP simulation: `FakeErpService` with latency/timeout/failure modes; stock compensation on failure.
 - Full order lifecycle: `PENDING → PROCESSING → COMPLETED | FAILED`.
 - Frontend MVP: product grid, quantity selector, checkout with idempotency, all error states (400/404/409/5xx), order confirmation with ID and status.
 
 ### Still missing for a complete delivery
-- Redis cache-aside for `GET /api/products` (Phase 10 bonus).
 - Production Dockerfiles + full-stack compose (Phase 11).
 - Final README with cloud deployment notes (Phase 12).
 
@@ -521,10 +536,9 @@ With idempotency complete, the next step is to cover all 6 mandatory business sc
 
 ## Current Progress
 
-**Last Completed Phase:** Phase 8 — Frontend MVP
+**Last Completed Phase:** Phase 10 — Redis Cache (Bonus)
 
-**Next Phase:** Phase 10 — Redis Cache (bonus) or Phase 11 — Production Dockerfiles
+**Next Phase:** Phase 11 — Production Dockerfiles
 
 **Do Not Start:**
-- Redis cache (Phase 10) — bonus, after core features
 - Production Dockerfiles (Phase 11) — after all features complete
