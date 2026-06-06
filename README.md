@@ -29,34 +29,56 @@ casecellshop/
 
 ## Como executar
 
-### 1. Subir a infraestrutura (MongoDB + Redis)
+### Opção A — Full stack com Docker (recomendado)
 
 ```bash
-docker compose up -d
+docker compose up --build
 ```
 
-Os dados são persistidos em volumes Docker (`mongo-data`, `redis-data`).
-Portas (configuráveis por env): MongoDB `27017`, Redis `6379`.
+Isso compila e sobe **quatro serviços** em um único comando:
 
-### 2. Configurar variáveis de ambiente
+| Serviço | URL | Descrição |
+|---|---|---|
+| Frontend | http://localhost:3000 | App Next.js (produto + checkout) |
+| Backend | http://localhost:3001/api | API NestJS |
+| Swagger | http://localhost:3001/api/docs | Documentação interativa |
+| MongoDB | localhost:27017 | Banco de dados |
+| Redis | localhost:6379 | Cache / health check |
+
+O seed de produtos roda automaticamente no primeiro boot. Os dados são persistidos em volumes Docker (`mongo-data`, `redis-data`).
+
+Para rebuild somente das imagens da aplicação (sem baixar layers novamente):
+```bash
+docker compose up --build
+```
+
+Para parar tudo:
+```bash
+docker compose down
+```
+
+Para parar e apagar volumes (reset completo):
+```bash
+docker compose down -v
+```
+
+---
+
+### Opção B — Dev mode (watch + hot reload)
+
+#### 1. Subir a infraestrutura (MongoDB + Redis)
+
+```bash
+docker compose up -d mongo redis
+```
+
+#### 2. Configurar variáveis de ambiente
 
 ```bash
 cp .env.example apps/backend/.env
 ```
 
-| Variável           | Padrão                                       | Descrição                              |
-| ------------------ | -------------------------------------------- | -------------------------------------- |
-| `PORT`             | `3001`                                       | Porta da API                           |
-| `MONGO_URI`        | `mongodb://localhost:27017/casecellshop`     | Conexão MongoDB                        |
-| `REDIS_HOST`       | `localhost`                                  | Host do Redis                          |
-| `REDIS_PORT`       | `6379`                                       | Porta do Redis                         |
-| `ERP_FAILURE_MODE` | `never`                                      | Simulação do ERP: `never`/`always`/`rate` |
-| `ERP_LATENCY_MS`   | `500`                                        | Latência artificial do ERP             |
-| `ERP_TIMEOUT_MS`   | `3000`                                       | Timeout da chamada ao ERP              |
-
-As variáveis são validadas no boot (`@nestjs/config` + `class-validator`); a aplicação falha rápido se algo estiver ausente ou inválido.
-
-### 3. Instalar dependências e rodar
+#### 3. Instalar dependências e rodar
 
 ```bash
 # backend
@@ -65,6 +87,28 @@ npm run dev:backend     # http://localhost:3001/api
 # frontend
 npm run dev:frontend    # http://localhost:3000
 ```
+
+---
+
+## Variáveis de ambiente
+
+| Variável              | Padrão                                       | Usado em        | Descrição |
+| --------------------- | -------------------------------------------- | --------------- | --------- |
+| `PORT`                | `3001`                                       | backend         | Porta da API |
+| `MONGO_URI`           | `mongodb://localhost:27017/casecellshop`     | backend         | Conexão MongoDB |
+| `REDIS_HOST`          | `localhost`                                  | backend         | Host do Redis |
+| `REDIS_PORT`          | `6379`                                       | backend         | Porta do Redis |
+| `CORS_ORIGIN`         | `http://localhost:3000`                      | backend         | Origem permitida no CORS |
+| `ERP_FAILURE_MODE`    | `never`                                      | backend         | Simulação do ERP: `never`/`always`/`rate` |
+| `ERP_LATENCY_MS`      | `500`                                        | backend         | Latência artificial do ERP |
+| `ERP_TIMEOUT_MS`      | `3000`                                       | backend         | Timeout da chamada ao ERP |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:3001/api`                  | frontend (build)| URL da API usada pelo browser |
+| `MONGO_PORT`          | `27017`                                      | docker-compose  | Porta do host para o MongoDB |
+| `FRONTEND_PORT`       | `3000`                                       | docker-compose  | Porta do host para o frontend |
+
+As variáveis do backend são validadas no boot (`@nestjs/config` + `class-validator`); a aplicação falha rápido se algo estiver ausente ou inválido.
+
+> **Docker Compose**: `MONGO_URI`, `REDIS_HOST` e `REDIS_PORT` são injetados automaticamente com os hostnames da rede Docker (`mongo`, `redis`). Não é necessário editar nada para o modo Docker.
 
 ## Endpoints
 
@@ -163,14 +207,15 @@ In E2E tests the service is replaced via `overrideProvider()` — zero flakiness
 
 ## Scripts
 
-| Script                    | Ação                                  |
-| ------------------------- | ------------------------------------- |
-| `npm run dev:backend`     | API NestJS em watch mode              |
-| `npm run dev:frontend`    | App Next.js em dev                    |
-| `npm test`                | Testes unitários do backend           |
-| `npm run test:e2e`        | Testes e2e do backend (requer infra)  |
-| `npm run lint`            | Lint de backend e frontend            |
-| `npm run build`           | Build de produção dos dois apps       |
+| Script                    | Ação |
+| ------------------------- | ----- |
+| `docker compose up --build` | Full stack em produção (tudo em containers) |
+| `npm run dev:backend`     | API NestJS em watch mode |
+| `npm run dev:frontend`    | App Next.js em dev |
+| `npm test`                | Testes unitários do backend (37 testes) |
+| `npm run test:e2e`        | Testes e2e do backend (requer `docker compose up -d mongo redis`) |
+| `npm run lint`            | Lint de backend e frontend |
+| `npm run build`           | Build de produção dos dois apps (sem Docker) |
 
 ## Frontend
 

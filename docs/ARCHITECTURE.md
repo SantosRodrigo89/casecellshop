@@ -60,6 +60,22 @@ AppModule
 - Ping MongoDB (`MongooseHealthIndicator`)
 - Ping Redis (`RedisHealthIndicator` customizado — terminus não tem nativo)
 
+## Container Architecture
+
+```
+docker compose up --build
+├── mongo     (mongo:7, port 27017, volume mongo-data)
+├── redis     (redis:7-alpine, port 6379, volume redis-data)
+├── backend   (node:22-alpine, port 3001, depends_on mongo+redis healthy)
+│   └── dist/main — compiled NestJS app
+└── frontend  (node:22-alpine, port 3000, depends_on backend)
+    └── .next/standalone/server.js — Next.js standalone server
+```
+
+`NEXT_PUBLIC_API_URL` is passed as a Docker build ARG and baked into the
+client bundle at image build time. Default: `http://localhost:3001/api`
+(the backend port mapped to the host, reachable by the browser).
+
 ## Fora do escopo (intencional)
 
 | Item              | Motivo                                        |

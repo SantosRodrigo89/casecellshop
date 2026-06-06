@@ -3,7 +3,7 @@
 > **Purpose:** Single source of truth for any AI assistant or developer picking up this project.
 > No prior conversation context is required to continue work from this document.
 >
-> **Last updated:** 2026-06-06 (Phase 10) | **Author:** AI-assisted development session
+> **Last updated:** 2026-06-06 (Phase 11) | **Author:** AI-assisted development session
 
 ---
 
@@ -54,9 +54,12 @@
 - **No Redis lock for idempotency** — deduplication relies on the MongoDB unique index on `idempotencyKey`.
 
 ### Infrastructure (Docker Compose)
-- Services: `mongo` (mongo:7) and `redis` (redis:7-alpine).
-- Both configured with healthchecks and named persistent volumes.
-- Backend and frontend Docker images: Phase 11.
+- Services: `mongo` (mongo:7), `redis` (redis:7-alpine), `backend`, `frontend`.
+- `mongo` and `redis`: healthchecks, named persistent volumes, host port mappings.
+- `backend`: multi-stage image (`node:22-alpine`), production-only dependencies, `dist/main` entrypoint. Depends on mongo (healthy) + redis (healthy). Connects via Docker network (`mongo:27017`, `redis:6379`).
+- `frontend`: multi-stage image with Next.js standalone output (`node:22-alpine`). `NEXT_PUBLIC_API_URL` injected as build ARG. Depends on backend.
+- Full stack starts with `docker compose up --build`.
+- Image sizes: `backend` ~223 MB, `frontend` ~214 MB.
 
 ### API Documentation (Swagger)
 - Available at `GET /api/docs` (Swagger UI) and `GET /api/docs-json` (OpenAPI JSON).
@@ -334,14 +337,33 @@
 
 ---
 
-### Phase 11 — Production Dockerfiles
+### Phase 11 — Production Dockerfiles ✅
 **Goal:** Multi-stage Docker images for backend and frontend; full-stack Docker Compose.
 
-**Expected deliverables:**
-- `apps/backend/Dockerfile`: build stage (`nest build`) + production stage (`node dist/main`).
-- `apps/frontend/Dockerfile`: build stage (`next build`) + production stage.
-- `docker-compose.yml` updated with `backend` and `frontend` services.
-- Environment variables properly passed at container level.
+**Deliverables:**
+- `apps/backend/Dockerfile` — two-stage build on `node:22-alpine`:
+  - **builder**: installs all deps + runs `nest build`.
+  - **production**: installs only production deps (`--omit=dev`), copies `dist/`, exposes 3001, runs `node dist/main`.
+- `apps/frontend/Dockerfile` — two-stage build on `node:22-alpine`:
+  - **builder**: accepts `ARG NEXT_PUBLIC_API_URL`, installs all deps, runs `next build` (standalone output).
+  - **production**: copies `.next/standalone`, `.next/static`, `public/`; exposes 3000; runs `node server.js`.
+- `apps/frontend/next.config.ts` — added `output: "standalone"` for minimal production image.
+- `apps/backend/.dockerignore` / `apps/frontend/.dockerignore` — excludes `node_modules`, `dist`/`.next`, `.env` from build context.
+- `docker-compose.yml` updated — four services: `mongo`, `redis`, `backend`, `frontend`.
+  - `backend` depends on mongo (healthy) + redis (healthy); env vars via compose; connects via Docker network.
+  - `frontend` depends on backend; `NEXT_PUBLIC_API_URL` injected as build ARG.
+- `apps/backend/.env.example` and `apps/frontend/.env.example` created.
+- Root `.env.example` updated with all host-port and build-arg variables.
+- Image sizes: `backend` ~223 MB, `frontend` ~214 MB.
+- Startup command: `docker compose up --build`.
+
+**Verified live:**
+- `GET /api/health` → `{ "status": "ok", "info": { "mongodb": { "status": "up" }, "redis": { "status": "up" } } }`
+- `GET /api/products` → 5 seeded products (seed ran automatically on first boot)
+- `POST /api/orders` → order created, status `COMPLETED`, stock decremented
+- `GET http://localhost:3000` → Next.js frontend serving HTML
+
+**Status:** ✅ Complete. `docker compose up --build` brings up the full stack from zero.
 
 **Dependencies:** All feature phases complete.
 
@@ -480,7 +502,6 @@ The orders suite uses the `casecellshop-e2e` database and cleans up after itself
 |---|---|---|
 | Stock compensation is non-transactional | No replica set in Docker Compose; compensate with `$inc` on ERP failure — documented ADR trade-off | Accepted |
 | ERP `rate` mode uses `Math.random()` | Non-deterministic by design; tests always use `overrideProvider` stub | Accepted |
-| No production Dockerfiles | Phase 11 | Phase 11 |
 | Cache returns plain objects (not Mongoose documents) | JSON round-trip strips Mongoose methods; controller serialises to JSON anyway | Accepted |
 
 ---
@@ -516,7 +537,6 @@ With idempotency complete, the next step is to cover all 6 mandatory business sc
 - Frontend MVP: product grid, quantity selector, checkout with idempotency, all error states (400/404/409/5xx), order confirmation with ID and status.
 
 ### Still missing for a complete delivery
-- Production Dockerfiles + full-stack compose (Phase 11).
 - Final README with cloud deployment notes (Phase 12).
 
 ### Main risks
@@ -536,9 +556,6 @@ With idempotency complete, the next step is to cover all 6 mandatory business sc
 
 ## Current Progress
 
-**Last Completed Phase:** Phase 10 — Redis Cache (Bonus)
+**Last Completed Phase:** Phase 11 — Production Dockerfiles
 
-**Next Phase:** Phase 11 — Production Dockerfiles
-
-**Do Not Start:**
-- Production Dockerfiles (Phase 11) — after all features complete
+**Next Phase:** Phase 12 — Final Documentation

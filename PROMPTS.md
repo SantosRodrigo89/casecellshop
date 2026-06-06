@@ -283,3 +283,36 @@ Este arquivo registra os prompts relevantes utilizados durante o desenvolvimento
 - `npm test`: 37/37 verdes (5 novos testes de cache adicionados)
 - `nest build`: limpo
 - `next build`: limpo
+
+---
+
+## Fase 11 — Production Dockerfiles
+
+**Prompt:** Implement Phase 11 — Production Dockerfiles. Multi-stage Dockerfiles for backend and frontend. docker-compose.yml updated with backend and frontend services. Backend depends on mongo (healthy) + redis (healthy). Frontend uses Next.js standalone output. NEXT_PUBLIC_API_URL injected as build ARG. .env.example files created. Validate with docker compose up --build. Update PROJECT_STATUS.md, README.md, PROMPTS.md.
+
+**Resultado:**
+- `apps/backend/Dockerfile` — builder (node:22-alpine, `npm ci`, `nest build`) + production (prod deps only, `node dist/main`).
+- `apps/frontend/Dockerfile` — builder (`ARG NEXT_PUBLIC_API_URL`, `npm ci`, `next build`) + production (standalone `node server.js`).
+- `apps/frontend/next.config.ts` — adicionado `output: "standalone"` para imagem mínima.
+- `apps/backend/.dockerignore` + `apps/frontend/.dockerignore` — excluem `node_modules`, artefatos de build e `.env`.
+- `docker-compose.yml` — atualizado com serviços `backend` e `frontend`; backend conecta ao Mongo e Redis via rede Docker; frontend recebe `NEXT_PUBLIC_API_URL` como build ARG.
+- `apps/backend/.env.example` + `apps/frontend/.env.example` criados.
+- `.env.example` raiz atualizado com todas as variáveis (host ports, build args, backend config).
+- `docs/ARCHITECTURE.md` — seção "Container Architecture" adicionada.
+- `README.md` — seções "Opção A (Docker)" e tabela de variáveis adicionadas.
+
+**Decisões:**
+- `output: "standalone"` no Next.js: gera `server.js` com dependências mínimas — imagem ~214 MB vs >500 MB sem standalone.
+- `NEXT_PUBLIC_API_URL` como build ARG: variáveis `NEXT_PUBLIC_*` são embutidas no bundle JS no build time; valor padrão `http://localhost:3001/api` funciona para demo local pois a porta 3001 é mapeada no host.
+- `HOSTNAME=0.0.0.0` no frontend: necessário para o servidor standalone aceitar conexões de fora do container.
+- `depends_on` com `condition: service_healthy` no backend: evita boot antes do Mongo e Redis estarem prontos; backend tem seed que roda no `OnModuleInit`.
+- Sem healthcheck no serviço `backend`: simplifica o compose; o frontend usa `depends_on: backend` (started), aceitável para demo.
+
+**Validação:**
+- `docker compose build`: 0 erros; imagens `backend` ~223 MB, `frontend` ~214 MB.
+- `docker compose up`: todos os 4 containers sobem; `casecellshop-mongo` e `casecellshop-redis` já estavam (healthy).
+- `GET /api/health`: `{"status":"ok","info":{"mongodb":{"status":"up"},"redis":{"status":"up"}}}`.
+- `GET /api/products`: 5 produtos do seed.
+- `POST /api/orders`: pedido criado com status `COMPLETED`, stock decrementado.
+- `GET http://localhost:3000`: frontend servindo HTML.
+- Startup único: `docker compose up --build`.
