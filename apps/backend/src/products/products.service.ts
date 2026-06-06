@@ -1,12 +1,16 @@
 import { Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Product, ProductDocument } from './schemas/product.schema';
 
-/**
- * Lógica de negócio dos produtos.
- * Schema Mongoose, seed automática e cache Redis chegam na Fase 4.
- */
 @Injectable()
 export class ProductsService {
-  findAll() {
-    return [];
+  constructor(
+    @InjectModel(Product.name)
+    private readonly productModel: Model<ProductDocument>,
+  ) {}
+
+  async findAll(): Promise<ProductDocument[]> {
+    return this.productModel.find().sort({ name: 1 }).exec();
   }
 }

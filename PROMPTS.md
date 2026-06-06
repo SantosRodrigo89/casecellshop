@@ -74,3 +74,31 @@ Este arquivo registra os prompts relevantes utilizados durante o desenvolvimento
 - Logger pino em JSON (sem `pino-pretty`) para reduzir dependências e ser production-friendly
 - Env validada no boot: a aplicação falha rápido se uma variável obrigatória faltar
 - Mantida a estrutura tradicional do NestJS; nenhuma regra de negócio (Products/Orders) implementada
+
+---
+
+## Fase 4 — Products
+
+**Prompt:** Módulo Products completo: schema Mongoose, seed automática (3-5 produtos, só quando vazio), GET /api/products ordenado por nome, DTOs com Swagger, testes para service e seed.
+
+**Resultado:**
+- `products/schemas/product.schema.ts` — schema Mongoose com `timestamps: true`, `versionKey: false` e transform `toJSON` para expor `id` em vez de `_id`
+- `products/products.seed.ts` — constante `PRODUCT_SEEDS` com 5 capinhas de exemplo
+- `products/products-seed.service.ts` — `OnModuleInit` que chama `countDocuments()` e insere apenas se a coleção estiver vazia; idempotente
+- `products/products.service.ts` — `findAll()` com `find().sort({ name: 1 }).exec()`
+- `products/products.controller.ts` — `GET /api/products` com `@ApiTags`, `@ApiOperation`, `@ApiOkResponse`
+- `products/dto/product-response.dto.ts` — `@ApiProperty` em todos os campos
+- `products/products.service.spec.ts` — testa `findAll()` (retorno correto + encadeamento sort)
+- `products/products-seed.service.spec.ts` — testa seed quando vazia (insere), quando populada (pula), e formato dos seeds
+
+**Decisões:**
+- Seed separada do `ProductsService`: mantém separação de responsabilidades e permite testar os dois de forma independente (o `OnModuleInit` não interfere nos unit tests do service)
+- `Record<string, unknown>` no transform do toJSON: evita `any` e satisfaz o ESLint (`no-unsafe-member-access`)
+- `createdAt` / `updatedAt` declarados na classe `Product` para TypeScript reconhecê-los no tipo de retorno
+
+**Validação:**
+- `tsc --noEmit`: limpo
+- `npm run lint`: limpo
+- `npm test`: 9/9 verdes (3 suites: health, products service, products seed)
+- `GET /api/products` ao vivo: 5 produtos do seed, ordenados por nome, com `id` em vez de `_id`
+- `GET /api/docs`: Swagger atualizado com a tag `products` e schema `ProductResponseDto`
