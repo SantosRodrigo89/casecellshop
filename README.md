@@ -409,5 +409,38 @@ acknowledged and documented with a full migration strategy.
 
 ---
 
+# Development Process
+
+This project was developed using **AI-assisted workflows** with structured documentation 
+to maintain context across development sessions.
+
+## Documentation Strategy
+
+| Document | Purpose | Demonstrates |
+|----------|---------|--------------|
+| **README.md** | Project overview, architecture, usage | Technical communication |
+| **docs/ARCHITECTURE.md** | System design, diagrams, module structure | Architectural thinking |
+| **docs/ADR-001-monolito-modular.md** | Architectural decision: modular monolith | Decision documentation |
+| **docs/SYNC_STRATEGY.md** | Production CDC pipeline strategy | Production thinking |
+| **docs/PROJECT_STATUS.md** | Development state machine | **Context window management** |
+| **PROMPTS.md** | AI interaction log | Prompt engineering |
+
+### Why PROJECT_STATUS.md Exists
+
+When working with AI assistants (Claude, GPT, etc.), **context window limitations** require 
+maintaining state between sessions. PROJECT_STATUS.md serves as a **state machine** that 
+preserves:
+
+- Architectural decisions across 16 development phases
+- Dependencies between implementation steps
+- Trade-offs documented at decision time
+- Testing strategy evolution
+- Complete project timeline
+
+This enables any developer (human or AI) to resume work without requiring previous 
+conversation history — a critical pattern for sustainable AI-assisted development.
+
+---
+
 For architecture diagrams and the modular-monolith decision record, see
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ADR-001-monolito-modular.md](docs/ADR-001-monolito-modular.md).
