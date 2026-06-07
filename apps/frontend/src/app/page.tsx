@@ -368,7 +368,7 @@ export default function HomePage() {
                   GitHub
                 </a>
                 <a
-                  href="https://www.linkedin.com/in/rodrigovieirabatistadossantos"
+                  href="https://www.linkedin.com/in/rodrigo-v-b9ba696a/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="footer-social-link"
