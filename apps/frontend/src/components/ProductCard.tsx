@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { Product, Order, ApiError } from '@/types';
 import { api } from '@/lib/api';
+import CheckoutDrawer from '@/components/CheckoutDrawer';
 
 interface Props {
   product: Product;
@@ -39,11 +40,20 @@ export default function ProductCard({ product, onPurchased }: Props) {
   const [isHovered, setIsHovered] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [state, setState] = useState<CheckoutState>({ type: 'idle' });
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const isLoading = state.type === 'loading';
   const outOfStock = product.stock === 0;
 
-  async function handleBuy() {
+  function openDrawer() {
+    setDrawerOpen(true);
+  }
+
+  function closeDrawer() {
+    setDrawerOpen(false);
+  }
+
+  async function handleConfirm() {
     setState({ type: 'loading' });
     const idempotencyKey = crypto.randomUUID();
     try {
@@ -52,6 +62,8 @@ export default function ProductCard({ product, onPurchased }: Props) {
       setState({ type: 'success', order });
     } catch (err) {
       setState({ type: 'error', message: getErrorMessage(err) });
+    } finally {
+      setDrawerOpen(false);
     }
   }
 
@@ -213,30 +225,23 @@ export default function ProductCard({ product, onPurchased }: Props) {
             )}
 
             <button
-              onClick={handleBuy}
-              disabled={isLoading || outOfStock}
-              aria-busy={isLoading}
-              aria-disabled={isLoading || outOfStock}
-              aria-label={
-                isLoading
-                  ? `Processando compra de ${product.name}`
-                  : outOfStock
-                    ? `${product.name} sem estoque`
-                    : `Comprar ${product.name}`
-              }
+              onClick={openDrawer}
+              disabled={outOfStock}
+              aria-disabled={outOfStock}
+              aria-label={outOfStock ? `${product.name} sem estoque` : `Comprar ${product.name}`}
               style={{
                 padding: '11px 0',
                 borderRadius: '8px',
                 border: 'none',
-                backgroundColor: isLoading || outOfStock ? '#94a3b8' : '#0f172a',
+                backgroundColor: outOfStock ? '#94a3b8' : '#0f172a',
                 color: '#ffffff',
                 fontWeight: 700,
                 fontSize: '0.875rem',
-                cursor: isLoading || outOfStock ? 'not-allowed' : 'pointer',
+                cursor: outOfStock ? 'not-allowed' : 'pointer',
                 transition: 'background-color 0.15s',
               }}
             >
-              {isLoading ? 'Processando…' : outOfStock ? 'Sem estoque' : 'Comprar'}
+              {outOfStock ? 'Sem estoque' : 'Comprar'}
             </button>
           </>
         )}
@@ -313,6 +318,16 @@ export default function ProductCard({ product, onPurchased }: Props) {
           </div>
         )}
       </div>
+
+      {drawerOpen && (
+        <CheckoutDrawer
+          product={product}
+          quantity={quantity}
+          isLoading={isLoading}
+          onClose={closeDrawer}
+          onConfirm={handleConfirm}
+        />
+      )}
     </article>
   );
 }

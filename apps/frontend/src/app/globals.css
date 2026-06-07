@@ -89,3 +89,21 @@ body {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 200, 255, 0.15);
 }
+
+@keyframes slideInFromRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.checkout-drawer {
+  animation: slideInFromRight 0.28s ease forwards;
+}
+
+.checkout-overlay {
+  animation: fadeInOverlay 0.22s ease forwards;
+}
