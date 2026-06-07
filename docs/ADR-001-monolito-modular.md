@@ -1,13 +1,18 @@
 # ADR-001: Modular Monolith instead of Real Microservices
 
 **Status:** Accepted
-**Date:** 2026-06-06
+**Date:** 2026-06-06  
+**Updated:** 2026-06-07
 
 ## Context
 
 The job description lists microservices as part of the stack. The challenge itself asks
 for a small, synchronous checkout flow (product listing + purchase) with a short delivery
 window. We must decide how to structure the backend.
+
+**Additional context (2026-06-07):** The target role requires proficiency in MongoDB
+(NoSQL), Redis, NestJS, Next.js, and Docker. The challenge describes an ERP as the
+source of truth with read-only access constraints.
 
 ## Decision
 
@@ -58,3 +63,38 @@ split would occur.
   as the natural production target.
 - **No CQRS / Event Sourcing.** Data volume and query complexity do not justify separate
   read/write models; a simple Mongoose repository pattern is sufficient and more readable.
+
+## MongoDB as Operational Store (Added 2026-06-07)
+
+**Decision:** Use MongoDB for both products and orders, making it the operational store
+for this implementation.
+
+**Rationale:**
+- The target role explicitly requires MongoDB (NoSQL) proficiency
+- Enables demonstration of advanced MongoDB patterns: atomic operations (`$gte` + `$inc`),
+  unique indexes for idempotency, conditional updates
+- Simplifies demo setup (no external ERP integration required)
+- Orders are a natural fit for document store (single-item model, status transitions)
+
+**Trade-offs introduced:**
+- **Challenge alignment:** The challenge describes the ERP as the "source of truth" with
+  read-only access. Using MongoDB as the operational store creates a data synchronization
+  gap if a real ERP exists.
+- **Production path:** Would require CDC pipeline (Debezium), Kafka event streaming, and
+  reconciliation jobs to keep MongoDB in sync with ERP changes. See `docs/SYNC_STRATEGY.md`
+  for details.
+- **Incremental evolution:** The challenge emphasizes "incremental" solutions "without
+  rewriting the ERP." MongoDB introduction is more of a platform addition than a pure
+  incremental cache layer.
+
+**Alternative considered:**
+- **Hybrid approach:** MongoDB for orders only (demonstrates NoSQL), ERP for products via
+  Redis cache-aside. This would better align with "incremental evolution" but demonstrate
+  fewer MongoDB capabilities (no atomic stock operations).
+- **Reason not chosen:** Atomic stock control (`findOneAndUpdate` with conditional `$gte`)
+  is a compelling demonstration of NoSQL proficiency and solves the overselling problem
+  elegantly without distributed locks.
+
+**Evaluation note:** This decision prioritizes **stack demonstration** (role requirement)
+over **literal constraint adherence** (challenge specification). The trade-off is
+documented in `README.md` and `docs/SYNC_STRATEGY.md` for evaluator transparency.

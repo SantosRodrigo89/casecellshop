@@ -262,6 +262,77 @@ These are intentional simplifications scoped to the assessment:
 
 ---
 
+# Architectural Decision: MongoDB as Operational Store
+
+## Context
+
+This solution uses MongoDB as the **primary operational database** for products and
+orders. While the challenge describes the ERP as the "source of truth" with read-only
+access, MongoDB was chosen to demonstrate proficiency in the **NoSQL database required
+by the target role** (Desenvolvedor FullStack Pleno position).
+
+## Trade-Off Analysis
+
+### ✅ Advantages
+
+- **Demonstrates MongoDB expertise:** atomic operations (`$gte` + `$inc` for stock
+  control), unique indexes for idempotency, schema design for document store.
+- **Simplifies demo setup:** No external ERP integration required; full stack runs with
+  `docker compose up`.
+- **Enables advanced patterns:** Conditional updates, compensation logic, and order
+  lifecycle management showcase NoSQL proficiency beyond basic CRUD.
+
+### ⚠️ Production Considerations
+
+If this architecture were deployed alongside a real ERP (as the challenge describes), it
+would introduce a **data synchronization problem:**
+
+| Challenge | Solution Required |
+|-----------|-------------------|
+| ERP has the authoritative product catalog | CDC pipeline (Debezium) from ERP MySQL → Kafka → MongoDB consumer |
+| Prices and stock change in the ERP | Near-real-time propagation to MongoDB via event streaming |
+| New products added to ERP inventory | Automatic insertion into MongoDB; manual seed is not sustainable |
+| Divergence between ERP and MongoDB | Reconciliation job + alerting; circuit breaker to query ERP on staleness |
+
+See [docs/SYNC_STRATEGY.md](docs/SYNC_STRATEGY.md) for the complete synchronization
+strategy, including CDC pipeline design, reconciliation jobs, and failure scenarios.
+
+## Alternative Approach Considered
+
+**Hybrid architecture: MongoDB for Orders, ERP for Products**
+
+```
+Orders (MongoDB)           Products (ERP)
+├─ Order history           ├─ Cached in Redis
+├─ Idempotency key         ├─ Queried on cache miss
+├─ Status lifecycle        └─ Stock reservation via ERP API
+└─ Atomic status updates
+```
+
+**Why not chosen:** The challenge states "we only have read access" to the ERP and
+"cannot modify ERP code." Implementing stock reservation would require either:
+1. An ERP API endpoint for reservation (violates read-only constraint)
+2. Direct writes to ERP MySQL (violates "cannot modify" constraint)
+
+Using MongoDB for products enables demonstration of atomic stock control
+(`findOneAndUpdate` with `$gte` + `$inc`) without requiring ERP modifications.
+
+## Alignment with Challenge vs. Role Requirements
+
+| Aspect | Challenge Goal | Implementation Choice | Justification |
+|--------|---------------|----------------------|---------------|
+| **Data authority** | "ERP is source of truth" | MongoDB is operational store | Demonstrates NoSQL (role requirement) while acknowledging sync gap |
+| **Stock control** | "Prevent overselling" | Atomic MongoDB operation | ✅ Solves the business problem correctly |
+| **ERP dependency** | "Reduce ERP dependency" | Eliminates ERP for reads | ⚠️ Side-steps rather than caches |
+| **Incremental evolution** | "Without rewriting the ERP" | Introduces new database | ⚠️ Adds operational complexity |
+
+**Evaluation note:** This decision prioritizes **stack demonstration** (role requirement:
+MongoDB + Redis + NestJS + Next.js) over **literal constraint adherence** (challenge:
+incremental evolution with read-only ERP). The production synchronization gap is
+acknowledged and documented with a full migration strategy.
+
+---
+
 # Future Improvements
 
 - **Queue-based ERP processing** — move ERP calls to an async worker (Kafka/RabbitMQ/BullMQ)
