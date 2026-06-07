@@ -23,6 +23,7 @@ export class ProductsSeedService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await this.runSeed();
+    await this.migrateImageUrls();
   }
 
   async runSeed(): Promise<void> {
@@ -37,5 +38,21 @@ export class ProductsSeedService implements OnModuleInit {
     this.logger.log(
       `Seed complete — ${PRODUCT_SEEDS.length} products inserted.`,
     );
+  }
+
+  /**
+   * Idempotent image-URL migration: runs on every boot and sets imageUrl for
+   * each seed product by matching on slug. Safe to run against a fresh insert
+   * (no-op) or an existing collection with stale placeholder URLs.
+   */
+  async migrateImageUrls(): Promise<void> {
+    const operations = PRODUCT_SEEDS.map((seed) => ({
+      updateOne: {
+        filter: { slug: seed.slug },
+        update: { $set: { imageUrl: seed.imageUrl } },
+      },
+    }));
+    await this.productModel.bulkWrite(operations);
+    this.logger.log('Image URLs synced for all seed products.');
   }
 }

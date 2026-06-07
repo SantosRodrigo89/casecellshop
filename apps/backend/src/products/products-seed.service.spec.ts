@@ -10,6 +10,7 @@ describe('ProductsSeedService', () => {
   const mockProductModel = {
     countDocuments: jest.fn(),
     insertMany: jest.fn(),
+    bulkWrite: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -18,6 +19,7 @@ describe('ProductsSeedService', () => {
     // Return a non-zero count so onModuleInit skips the insert during setup.
     mockProductModel.countDocuments.mockResolvedValue(1);
     mockProductModel.insertMany.mockResolvedValue([]);
+    mockProductModel.bulkWrite.mockResolvedValue({});
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -60,6 +62,32 @@ describe('ProductsSeedService', () => {
         expect(seed).toHaveProperty('slug');
         expect(seed).toHaveProperty('price');
         expect(seed).toHaveProperty('stock');
+        expect(seed).toHaveProperty('imageUrl');
+      });
+    });
+  });
+
+  describe('migrateImageUrls()', () => {
+    it('should call bulkWrite with one updateOne per seed product', async () => {
+      mockProductModel.bulkWrite.mockResolvedValue({});
+
+      await service.migrateImageUrls();
+
+      expect(mockProductModel.bulkWrite).toHaveBeenCalledTimes(1);
+      const [ops] = mockProductModel.bulkWrite.mock.calls[0] as [
+        {
+          updateOne: {
+            filter: { slug: string };
+            update: { $set: { imageUrl: string } };
+          };
+        }[],
+      ];
+      expect(ops).toHaveLength(PRODUCT_SEEDS.length);
+      ops.forEach((op, i) => {
+        expect(op.updateOne.filter.slug).toBe(PRODUCT_SEEDS[i].slug);
+        expect(op.updateOne.update.$set.imageUrl).toBe(
+          PRODUCT_SEEDS[i].imageUrl,
+        );
       });
     });
   });

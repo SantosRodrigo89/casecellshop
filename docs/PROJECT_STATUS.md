@@ -3,17 +3,17 @@
 > **Purpose:** Single source of truth for any AI assistant or developer picking up this project.
 > No prior conversation context is required to continue work from this document.
 >
-> **Last updated:** 2026-06-06 (Phase 12 — Final Documentation) | **Author:** AI-assisted development session
+> **Last updated:** 2026-06-06 (Phase 13 — Frontend Enhancement) | **Author:** AI-assisted development session
 
 ---
 
 ## Submission Status
 
 - **Project Status:** READY FOR SUBMISSION
-- **Last Completed Phase:** Phase 12 — Final Documentation
+- **Last Completed Phase:** Phase 13 — Frontend Enhancement
 - **Next Phase:** None
 
-All 12 phases are complete. The full stack runs with `docker compose up --build`. Code is
+All 13 phases are complete. The full stack runs with `docker compose up --build`. Code is
 English-only with 0 lint errors/warnings, 37/37 unit tests and 7/7 E2E tests green, and a
 clean `tsc` / `nest build` / `next build`.
 
@@ -551,10 +551,31 @@ The orders suite uses the `casecellshop-e2e` database and cleans up after itself
 
 ---
 
+### Phase 13 — Frontend Enhancement ✅
+**Goal:** Improve visual presentation while preserving all existing functionality and API contracts.
+
+**Deliverables:**
+- **Hero section** — full-width dark-blue (`#0f172a`) landing hero above the product grid. Left column: title, subtitle, three feature highlights with `#00C8FF` accent badges, and a "Ver Produtos" CTA that smooth-scrolls to the products section. Right column: inline SVG illustration (phone + case outline + feature badges). Responsive: single-column on mobile, illustration hidden below 768 px.
+- **Product card redesign** — display-only card (image + name + price + stock). Hover effects: `translateY(-4px)` lift, stronger box-shadow (`0 12px 32px`), subtle image scale (`1.04×`), and accent-colored "Ver detalhes" button. Cursor pointer on hoverable cards.
+- **Product images** — displayed with `objectFit: cover` in a fixed-height (`200 px`) container. Graceful emoji fallback (`📱`) when `imageUrl` is absent.
+- **Product detail modal** (`ProductModal.tsx`) — opens on card click. Larger image (`260 px`), product name, price, stock count, optional description, quantity selector, "Comprar agora" button. Full checkout flow (API call, idempotency key, success/error states, "Comprar novamente" reset). Accessible: `role="dialog"`, `aria-modal`, Escape key and backdrop-click to close, body scroll locked while open.
+- **Footer** — dark-themed footer with brand name, author credit (Rodrigo Vieira Batista dos Santos), GitHub and LinkedIn links, and tech stack badges. Responsive three-column → single-column layout.
+- **Responsive CSS** — `hero-grid` and `footer-grid` utility classes added to `globals.css`.
+- **`types/index.ts`** — added optional `description?: string` field to `Product` (forward-compatible; backend does not yet return it).
+- 0 lint errors, 0 lint warnings, `next build` clean.
+
+**No backend, API contract, or test changes were made.**
+
+**Status:** ✅ Complete.
+
+**Dependencies:** Phase 12 complete.
+
+---
+
 ## Current Progress
 
 **Project Status:** READY FOR SUBMISSION
 
-**Last Completed Phase:** Phase 12 — Final Documentation
+**Last Completed Phase:** Phase 13 — Frontend Enhancement
 
 **Next Phase:** None
