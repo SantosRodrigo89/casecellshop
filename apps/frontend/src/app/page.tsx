@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Product } from '@/types';
 import { api } from '@/lib/api';
 import ProductCard from '@/components/ProductCard';
@@ -10,13 +10,16 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    api.products
+  const fetchProducts = useCallback(() => {
+    return api.products
       .list()
       .then(setProducts)
-      .catch(() => setError('Não foi possível carregar os produtos. Verifique se o servidor está em execução.'))
-      .finally(() => setLoading(false));
+      .catch(() => setError('Não foi possível carregar os produtos. Verifique se o servidor está em execução.'));
   }, []);
+
+  useEffect(() => {
+    fetchProducts().finally(() => setLoading(false));
+  }, [fetchProducts]);
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
@@ -94,7 +97,7 @@ export default function HomePage() {
             }}
           >
             {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <ProductCard key={product.id} product={product} onPurchased={fetchProducts} />
             ))}
           </div>
         )}

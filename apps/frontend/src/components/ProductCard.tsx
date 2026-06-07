@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 
 interface Props {
   product: Product;
+  onPurchased: () => void;
 }
 
 type CheckoutState =
@@ -45,7 +46,7 @@ function getErrorMessage(err: unknown): string {
   }
 }
 
-export default function ProductCard({ product }: Props) {
+export default function ProductCard({ product, onPurchased }: Props) {
   const [quantity, setQuantity] = useState(1);
   const [state, setState] = useState<CheckoutState>({ type: 'idle' });
 
@@ -57,6 +58,7 @@ export default function ProductCard({ product }: Props) {
     const idempotencyKey = crypto.randomUUID();
     try {
       const order = await api.orders.create({ productId: product.id, quantity }, idempotencyKey);
+      onPurchased();
       setState({ type: 'success', order });
     } catch (err) {
       setState({ type: 'error', message: getErrorMessage(err) });
