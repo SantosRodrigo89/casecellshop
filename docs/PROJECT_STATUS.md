@@ -34,7 +34,7 @@ first paint (~5ms).
 
 **Name:** CaseCellShop
 
-**Challenge summary:** Full-stack technical assessment for a Senior Fullstack Engineer position. The required stack is NestJS, Next.js, MongoDB, Redis, Docker, and TypeScript. The deliverable is a functional checkout mini-flow for a phone case store.
+**Challenge summary:** Full-stack technical assessment for a Mid-level Fullstack Developer position. The required stack is NestJS, Next.js, MongoDB, Redis, Docker, and TypeScript. The deliverable is a functional checkout mini-flow for a phone case store.
 
 **Business problem:** Build a system that reliably handles three core concerns:
 1. **Storefront performance** — product listing with eventual cache support.

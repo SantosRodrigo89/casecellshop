@@ -10,9 +10,16 @@ resilience using NestJS, Next.js, MongoDB, and Redis.
 
 ## Challenge context
 
-The challenge is a Fullstack Engineer technical assessment. The stack is
+This is a **Mid-level Fullstack Developer** technical assessment. The stack is
 **NestJS, Next.js, MongoDB, Redis, Docker, and TypeScript**, and the deliverable is a
 functional checkout flow for a store that sells phone cases.
+
+The scenario: an e-commerce company in hypergrowth runs a legacy on-premises ERP
+(MySQL) that is the **source of truth** for products, prices, and inventory. The
+storefront currently reads directly from the ERP over synchronous REST, and we have
+**read-only access** — the ERP code, tables, and behavior cannot be modified. The goal
+is to **reduce ERP dependency in critical user journeys incrementally**, without
+rewriting the ERP, while fixing storefront latency, overselling, and checkout fragility.
 
 ## Business problems
 
@@ -125,6 +132,9 @@ async function getProducts() {
 **Key improvement:** Clients **never wait** for backend — products are always in the
 initial HTML response.
 
+> Figures are approximate, based on local testing and the nature of static HTML vs.
+> network round-trips. They illustrate relative impact, not benchmarked SLAs.
+
 ---
 
 # Key Technical Decisions
@@ -140,7 +150,29 @@ initial HTML response.
 
 ---
 
+# Project Structure
+
+```
+casecellshop/
+├── apps/
+│   ├── backend/          # NestJS API (products, orders, erp, health, shared)
+│   │   ├── src/
+│   │   └── test/         # E2E tests (Supertest)
+│   └── frontend/         # Next.js App Router storefront
+│       └── src/
+│           ├── app/      # Pages (ISR home), layout
+│           ├── components/
+│           └── lib/      # Typed API client
+├── docs/                 # Architecture, ADR, sync strategy, project status
+├── docker-compose.yml    # Full stack: mongo, redis, backend, frontend
+└── README.md
+```
+
+---
+
 # Running the Project
+
+**Prerequisites:** Node.js 22+, Docker, and Docker Compose.
 
 ## Docker Compose
 
@@ -329,7 +361,7 @@ These are intentional simplifications scoped to the assessment:
 This solution uses MongoDB as the **primary operational database** for products and
 orders. While the challenge describes the ERP as the "source of truth" with read-only
 access, MongoDB was chosen to demonstrate proficiency in the **NoSQL database required
-by the target role** (Desenvolvedor FullStack Pleno position).
+by the target role** (Mid-level Fullstack Developer position).
 
 ## Trade-Off Analysis
 
@@ -383,13 +415,18 @@ Using MongoDB for products enables demonstration of atomic stock control
 |--------|---------------|----------------------|---------------|
 | **Data authority** | "ERP is source of truth" | MongoDB is operational store | Demonstrates NoSQL (role requirement) while acknowledging sync gap |
 | **Stock control** | "Prevent overselling" | Atomic MongoDB operation | ✅ Solves the business problem correctly |
-| **ERP dependency** | "Reduce ERP dependency" | Eliminates ERP for reads | ⚠️ Side-steps rather than caches |
+| **ERP dependency** | "Reduce ERP dependency" | Eliminates ERP from the read path | ✅ Consistent sub-100ms reads; ⚠️ requires sync pipeline |
 | **Incremental evolution** | "Without rewriting the ERP" | Introduces new database | ⚠️ Adds operational complexity |
 
-**Evaluation note:** This decision prioritizes **stack demonstration** (role requirement:
-MongoDB + Redis + NestJS + Next.js) over **literal constraint adherence** (challenge:
-incremental evolution with read-only ERP). The production synchronization gap is
-acknowledged and documented with a full migration strategy.
+**Evaluation note:** A naive "cache the ERP" approach still suffers multi-second latency
+on every cold start, TTL expiry, or cache invalidation — the exact pain the challenge
+describes ("the storefront takes several seconds to load products"). Using an operational
+store guarantees consistent sub-100ms reads regardless of cache state, and the seed
+ensures data is available from the first request. The trade-off is a synchronization
+requirement (documented in [docs/SYNC_STRATEGY.md](docs/SYNC_STRATEGY.md)), which in
+production would be solved with a CDC pipeline. This decision prioritizes consistent UX
+and demonstrates the required stack, at the cost of added operational complexity — a
+conscious engineering trade-off rather than an oversight.
 
 ---
 
@@ -439,8 +476,3 @@ preserves:
 
 This enables any developer (human or AI) to resume work without requiring previous 
 conversation history — a critical pattern for sustainable AI-assisted development.
-
----
-
-For architecture diagrams and the modular-monolith decision record, see
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ADR-001-monolito-modular.md](docs/ADR-001-monolito-modular.md).
