@@ -66,6 +66,7 @@ services:
       - '${FRONTEND_PORT:-3000}:3000'
     environment:
       NODE_ENV: production
+      BACKEND_URL: http://backend:3001/api
     depends_on:
       - backend
 
